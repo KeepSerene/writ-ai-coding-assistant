@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
 import type { CommandMenuItem } from "../components/command-menu/types";
 import { getFilteredCmdItems } from "../lib/utils";
 import { useKeyboard } from "@opentui/react";
+import { useInputStack } from "../providers/input-stack";
 
 interface CommandMenuControls {
   showCmdMenu: boolean;
@@ -21,6 +22,8 @@ export default function useCommandMenu(): CommandMenuControls {
 
   const scrollBoxRef = useRef<ScrollBoxRenderable>(null);
 
+  const { pushLayer, popLayer, isTopLayer } = useInputStack();
+
   // Extract the command query by stripping the leading "/" if the menu is active
   const cmdQuery =
     showCmdMenu && userInput.startsWith("/") ? userInput.slice(1) : "";
@@ -29,6 +32,11 @@ export default function useCommandMenu(): CommandMenuControls {
     () => getFilteredCmdItems(cmdQuery),
     [cmdQuery],
   );
+
+  const closeMenu = () => {
+    setShowCmdMenu(false);
+    popLayer("command-menu");
+  };
 
   const handleInputChange = (inputStr: string) => {
     setUserInput(inputStr);
@@ -41,8 +49,17 @@ export default function useCommandMenu(): CommandMenuControls {
     }
 
     const suffix = inputStr.startsWith("/") ? inputStr.slice(1) : null;
-    const showMenu = suffix !== null && !suffix.includes(" ");
-    setShowCmdMenu(showMenu);
+
+    if (suffix !== null && !suffix.includes(" ")) {
+      setShowCmdMenu(true);
+      pushLayer("command-menu", () => {
+        closeMenu();
+
+        return true;
+      });
+    } else {
+      closeMenu();
+    }
   };
 
   const resolveCmdItem = useCallback(
@@ -50,20 +67,22 @@ export default function useCommandMenu(): CommandMenuControls {
       const cmdItem = filteredCmdItems[index];
 
       // Auto-close the menu once an item is successfully resolved
-      if (cmdItem) setShowCmdMenu(false);
+      if (cmdItem) {
+        closeMenu();
+      }
 
       return cmdItem;
     },
-    [filteredCmdItems],
+    [filteredCmdItems, closeMenu],
   );
 
   // Handle keyboard navigation
   useKeyboard((key) => {
-    if (!showCmdMenu) return;
+    if (!showCmdMenu || !isTopLayer("command-menu")) return;
 
     if (key.name === "escape") {
       key.preventDefault();
-      setShowCmdMenu(false);
+      closeMenu();
     } else if (key.name === "up") {
       key.preventDefault();
       setSelectedCmdIndex((prev: number) => {
