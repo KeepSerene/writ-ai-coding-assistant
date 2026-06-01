@@ -5,6 +5,7 @@ import {
   MAX_VISIBLE_COMMAND_ITEMS,
 } from "../../lib/constants";
 import { getFilteredCmdItems } from "../../lib/utils";
+import { useTheme } from "../../providers/theme";
 
 interface CommandMenuProps {
   query: string;
@@ -26,11 +27,16 @@ export default function CommandMenu({
     filteredCmdItems.length,
     MAX_VISIBLE_COMMAND_ITEMS,
   );
+  const {
+    currentTheme: { colors },
+  } = useTheme();
 
   if (filteredCmdItems.length === 0) {
     return (
       <box paddingX={1}>
-        <text attributes={TextAttributes.DIM}>No matching commands</text>
+        <text attributes={TextAttributes.DIM} fg={colors.onSurface}>
+          No matching commands
+        </text>
       </box>
     );
   }
@@ -44,7 +50,7 @@ export default function CommandMenu({
           <box
             key={item.command}
             height={1}
-            backgroundColor={isSelected ? "#89b4fa" : undefined}
+            backgroundColor={isSelected ? colors.selection : undefined}
             paddingX={1}
             flexDirection="row"
             overflow="hidden"
@@ -52,13 +58,20 @@ export default function CommandMenu({
             onMouseDown={() => onExecuteCmd(index)}
           >
             <box width={COMMAND_COL_WIDTH} flexShrink={0}>
-              <text selectable={false} fg={isSelected ? "black" : "white"}>
+              <text
+                selectable={false}
+                fg={isSelected ? colors.onSelection : colors.onSurface}
+              >
                 {item.command}
               </text>
             </box>
 
             <box flexGrow={1} flexShrink={1} overflow="hidden">
-              <text selectable={false} fg={isSelected ? "black" : "gray"}>
+              <text
+                selectable={false}
+                attributes={isSelected ? undefined : TextAttributes.DIM}
+                fg={isSelected ? colors.onSelection : colors.onSurface}
+              >
                 {item.description}
               </text>
             </box>
