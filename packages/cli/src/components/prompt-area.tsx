@@ -55,7 +55,7 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
         textarea.insertText(cmdItem.command + " ");
       }
     },
-    [renderer, toast],
+    [renderer, toast, dialog],
   );
 
   const executeCmdItem = useCallback(
