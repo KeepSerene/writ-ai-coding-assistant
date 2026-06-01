@@ -1,46 +1,24 @@
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import Header from "./components/header";
-import PromptArea from "./components/prompt-area";
-import { ToastProvider } from "./providers/toast";
-import { InputStackProvider } from "./providers/input-stack";
-import { DialogProvider } from "./providers/dialog";
-import { ThemeProvider, useTheme } from "./providers/theme";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import RootLayout from "./layouts/root";
+import HomeScreen from "./screens/home";
+import NewSessionScreen from "./screens/new-session";
+import SessionScreen from "./screens/session";
 
-function AppContent() {
-  const {
-    currentTheme: { colors },
-  } = useTheme();
+const router = createMemoryRouter([
+  {
+    path: "/",
+    element: <RootLayout />,
+    children: [
+      { index: true, element: <HomeScreen /> },
+      { path: "/sessions/new", element: <NewSessionScreen /> },
+      { path: "/sessions/:sessionId", element: <SessionScreen /> },
+    ],
+  },
+]);
 
-  return (
-    <box
-      width="100%"
-      height="100%"
-      backgroundColor={colors.background}
-      justifyContent="center"
-      alignItems="center"
-      gap={2}
-    >
-      <Header />
-
-      <box width="100%" maxWidth={78} paddingX={2}>
-        <PromptArea onSubmit={() => {}} />
-      </box>
-    </box>
-  );
-}
-
-const App = () => (
-  <ThemeProvider>
-    <InputStackProvider>
-      <DialogProvider>
-        <ToastProvider>
-          <AppContent />
-        </ToastProvider>
-      </DialogProvider>
-    </InputStackProvider>
-  </ThemeProvider>
-);
+const App = () => <RouterProvider router={router} />;
 
 const renderer = await createCliRenderer({ targetFps: 60, exitOnCtrlC: false });
 createRoot(renderer).render(<App />);
