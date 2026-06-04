@@ -51,3 +51,25 @@ export function getSavedTheme(): Theme {
     return DEFAULT_THEME;
   }
 }
+
+interface CustomErrorResponse {
+  json: () => Promise<unknown>;
+  status: number;
+  statusText: string;
+}
+
+export async function getErrorMessage(response: CustomErrorResponse) {
+  try {
+    const data = (await response.json()) as { error?: string };
+
+    if (typeof data.error === "string" && data.error.length > 0) {
+      return data.error;
+    }
+  } catch (error) {
+    console.error("Failed to get error message:", error);
+  } finally {
+    return (
+      response.statusText || `Request failed with status ${response.status}`
+    );
+  }
+}
