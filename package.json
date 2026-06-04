@@ -1,9 +1,14 @@
 {
   "name": "writ",
   "version": "1.0.0",
+  "type": "module",
+  "private": true,
   "description": "An OpenCode clone",
   "scripts": {
-    "dev:cli": "pnpm --filter @writ/cli dev"
+    "dev:cli": "pnpm --filter @writ/cli dev",
+    "dev:server": "pnpm --filter @writ/server dev",
+    "db:generate": "pnpm --filter @writ/db db:generate",
+    "db:push": "pnpm --filter @writ/db db:push"
   },
   "keywords": [],
   "author": "Dhrubajyoti Bhattacharjee",
@@ -14,7 +19,5 @@
       "version": "^11.2.2",
       "onFail": "download"
     }
-  },
-  "type": "module",
-  "private": true
+  }
 }

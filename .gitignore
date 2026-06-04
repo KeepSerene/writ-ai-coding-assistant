@@ -32,3 +32,10 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# Prisma
+**/generated/prisma
+
+# Bun (used only as CLI runtime, not as package manager)
+bun.lock
+bun.lockb

@@ -8,7 +8,7 @@ export default function HomeScreen() {
 
   const handleSubmit = useCallback(
     (prompt: string) => {
-      navigate("/sessions/new", { state: { message: prompt } });
+      navigate("/sessions/new", { replace: true, state: { message: prompt } });
     },
     [navigate],
   );

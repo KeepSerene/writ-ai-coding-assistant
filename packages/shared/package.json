@@ -1,0 +1,13 @@
+{
+  "name": "@writ/shared",
+  "version": "1.0.0",
+  "author": "Dhrubajyoti Bhattacharjee",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}
