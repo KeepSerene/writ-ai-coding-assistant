@@ -1,31 +1,54 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { HTTPException } from "hono/http-exception";
+import { sentry } from "@sentry/hono/node";
+import * as Sentry from "@sentry/hono/node";
 import sessionsRouter from "./routes/sessions";
 
 const app = new Hono();
 
+// Sentry middleware
+app.use(sentry(app));
+
 app.onError((error, c) => {
   if (error instanceof HTTPException) {
+    Sentry.logger.warn("Handled HTTP error", {
+      status: error.status,
+      message: error.message || "Request failed",
+      path: c.req.path,
+      method: c.req.method,
+    });
+
     return c.json({ error: error.message || "Request failed" }, error.status);
   }
 
+  Sentry.logger.error("Unhandled server error", {
+    message: error instanceof Error ? error.message : "Unknown error",
+    path: c.req.path,
+    method: c.req.method,
+  });
   console.error("[server] Unhandled error:", error);
 
   return c.json({ error: "Internal server error" }, 500);
+});
+
+// Sentry verification route (optional)
+app.get("/debug-sentry", (_c) => {
+  Sentry.logger.info("User triggered test error", {
+    action: "test_error_endpoint",
+  });
+  Sentry.metrics.count("test_counter", 1);
+
+  throw new Error("My first Sentry error!");
 });
 
 const routes = app.route("/sessions", sessionsRouter);
 
 export type AppType = typeof routes;
 
-const port = process.env["PORT"];
+const port = Number(process.env["PORT"] ?? 3000);
 
-if (!port) {
-  throw new Error("PORT is missing in the environment");
-}
-
-const server = serve({ fetch: app.fetch, port: Number(port) }, (info) => {
+const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`[server] Listening on http://localhost:${info.port}`);
 });
 
