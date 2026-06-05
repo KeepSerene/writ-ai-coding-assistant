@@ -16,7 +16,8 @@
     "@writ/db": "workspace:*",
     "@writ/shared": "workspace:*",
     "hono": "^4.12.23",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

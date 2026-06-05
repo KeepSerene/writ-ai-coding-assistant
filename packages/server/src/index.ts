@@ -1,7 +1,11 @@
+import { config } from "dotenv";
+import { resolve } from "node:path";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { HTTPException } from "hono/http-exception";
 import sessionsRouter from "./routes/sessions";
+
+config({ path: resolve(import.meta.dirname, "../../../.env") });
 
 const app = new Hono();
 
@@ -19,7 +23,13 @@ const routes = app.route("/sessions", sessionsRouter);
 
 export type AppType = typeof routes;
 
-const server = serve({ fetch: app.fetch, port: 3000 }, (info) => {
+const port = process.env["PORT"];
+
+if (!port) {
+  throw new Error("PORT is missing in the environment");
+}
+
+const server = serve({ fetch: app.fetch, port: Number(port) }, (info) => {
   console.log(`[server] Listening on http://localhost:${info.port}`);
 });
 
@@ -32,6 +42,7 @@ function shutdown(signal: string) {
       console.error("[server] Error during shutdown:", err);
       process.exit(1);
     }
+
     console.log("[server] Shutdown complete.");
     process.exit(0);
   });
