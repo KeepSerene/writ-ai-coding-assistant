@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { findSupportedChatModel } from "@writ/shared";
 import { Hono } from "hono";
 import { Role, Mode, MessageStatus } from "@writ/db/enums";
-import { db } from "@writ/db";
+import { db } from "@writ/db/client";
 
 const newSessionSchema = z.object({
   title: z.string(),
