@@ -2,7 +2,7 @@
   "name": "@writ/server",
   "version": "1.0.0",
   "scripts": {
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch --env-file=../../.env src/index.ts"
   },
   "author": "Dhrubajyoti Bhattacharjee",
   "type": "module",
@@ -16,8 +16,7 @@
     "@writ/db": "workspace:*",
     "@writ/shared": "workspace:*",
     "hono": "^4.12.23",
-    "zod": "^4.4.3",
-    "dotenv": "^17.4.2"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

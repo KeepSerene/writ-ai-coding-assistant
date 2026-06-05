@@ -1,11 +1,7 @@
-import { config } from "dotenv";
-import { resolve } from "node:path";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { HTTPException } from "hono/http-exception";
 import sessionsRouter from "./routes/sessions";
-
-config({ path: resolve(import.meta.dirname, "../../../.env") });
 
 const app = new Hono();
 
