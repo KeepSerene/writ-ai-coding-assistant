@@ -4,6 +4,7 @@ import { findSupportedChatModel } from "@writ/shared";
 import { Hono } from "hono";
 import { Role, Mode, MessageStatus } from "@writ/db/enums";
 import { db } from "@writ/db/client";
+import * as Sentry from "@sentry/hono/node";
 
 const newSessionSchema = z.object({
   title: z.string(),
@@ -28,6 +29,11 @@ const newSessionValidator = zValidator(
   newSessionSchema,
   (result, c) => {
     if (!result.success) {
+      Sentry.logger.warn("Session creation validation failed", {
+        path: c.req.path,
+        issues: result.error.issues.length,
+      });
+
       return c.json({ error: "Invalid request body" }, 400);
     }
   },
@@ -44,6 +50,10 @@ const sessionsRouter = new Hono()
       },
     });
 
+    Sentry.logger.info("Sessions found", {
+      count: sessions.length,
+    });
+
     return c.json(sessions);
   })
   .get("/:id", async (c) => {
@@ -56,8 +66,17 @@ const sessionsRouter = new Hono()
     });
 
     if (!session) {
+      Sentry.logger.warn("Session not found", {
+        userId: "clerk-user", // TODO: integrate Clerk auth
+        sessionId: id,
+      });
+
       return c.json({ error: "Session not found" }, 404);
     }
+
+    Sentry.logger.info("Session loaded", {
+      sessionId: session.id,
+    });
 
     return c.json(session);
   })
@@ -78,6 +97,11 @@ const sessionsRouter = new Hono()
         }),
       },
       include: { messages: true },
+    });
+
+    Sentry.logger.info("Session created", {
+      sessionId: session.id,
+      title: session.title,
     });
 
     return c.json(session, 201);
