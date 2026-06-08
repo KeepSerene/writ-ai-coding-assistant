@@ -487,7 +487,9 @@ export const THEMES: Theme[] = [
   },
 ] as const;
 
-export const DEFAULT_THEME = THEMES[0]!;
+export const DEFAULT_THEME = THEMES.find(
+  (theme) => theme.name === "Catppuccin Mocha",
+)!;
 
 export const CONFIG_DIR = join(homedir(), ".writ");
 

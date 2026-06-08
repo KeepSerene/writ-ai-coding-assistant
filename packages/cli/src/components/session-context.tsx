@@ -12,7 +12,7 @@ function SessionContext() {
       <text attributes={TextAttributes.DIM} fg={colors.onSurface}>
         &rsaquo;
       </text>
-      <text fg={colors.text}>opus-4-6</text>
+      <text fg={colors.text}>gemini-2.5-flash</text>
     </box>
   );
 }

@@ -11,6 +11,7 @@ export {
 
 export {
   SUPPORTED_CHAT_MODELS,
+  SUPPORTED_CHAT_MODEL_IDS,
   DEFAULT_CHAT_MODEL_ID,
   findSupportedChatModel,
   type ModelPricing,

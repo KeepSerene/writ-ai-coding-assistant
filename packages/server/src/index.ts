@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { sentry } from "@sentry/hono/node";
 import * as Sentry from "@sentry/hono/node";
 import sessionsRouter from "./routes/sessions";
+import chatRouter from "./routes/chat";
 
 const app = new Hono();
 
@@ -42,7 +43,9 @@ app.get("/debug-sentry", (_c) => {
   throw new Error("My first Sentry error!");
 });
 
-const routes = app.route("/sessions", sessionsRouter);
+const routes = app
+  .route("/sessions", sessionsRouter)
+  .route("/sessions/:sessionId/chat", chatRouter);
 
 export type AppType = typeof routes;
 
