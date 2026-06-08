@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { findSupportedChatModel } from "@writ/shared";
 import { Hono } from "hono";
 import { Role, Mode, MessageStatus } from "@writ/db/enums";
 import { db } from "@writ/db/client";
 import * as Sentry from "@sentry/hono/node";
+import { SUPPORTED_CHAT_MODEL_IDS } from "@writ/shared";
 
 const newSessionSchema = z.object({
   title: z.string(),
@@ -14,12 +14,7 @@ const newSessionSchema = z.object({
       role: z.enum(Role),
       content: z.string(),
       mode: z.enum(Mode),
-      model: z
-        .string()
-        .refine(
-          (id) => Boolean(findSupportedChatModel(id)),
-          "Unsupported model",
-        ),
+      model: z.enum(SUPPORTED_CHAT_MODEL_IDS),
     })
     .optional(),
 });

@@ -9,6 +9,7 @@ interface SessionShellProps {
   onSubmit: (prompt: string) => void;
   promptAreaDisabled?: boolean;
   isLoading?: boolean;
+  canInterrupt?: boolean;
 }
 
 function SessionShell({
@@ -16,6 +17,7 @@ function SessionShell({
   onSubmit,
   promptAreaDisabled = false,
   isLoading = false,
+  canInterrupt = false,
 }: SessionShellProps) {
   const {
     currentTheme: { colors },
@@ -53,6 +55,10 @@ function SessionShell({
         {isLoading && (
           <box flexDirection="row" alignItems="center" gap={2}>
             <Loader />
+
+            {canInterrupt && (
+              <text fg={colors.onBackground}>Esc to interrupt</text>
+            )}
           </box>
         )}
 

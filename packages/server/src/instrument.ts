@@ -5,8 +5,13 @@ import { consoleIntegration } from "@sentry/node";
 const sentryDsn = process.env["SENTRY_DSN"];
 const isProd = process.env["NODE_ENV"] === "production";
 
+type SentryInitOptions = Parameters<typeof Sentry.init>[0] & {
+  profileSessionSampleRate?: number;
+  profileLifecycle?: "trace" | "manual";
+};
+
 if (sentryDsn) {
-  Sentry.init({
+  const sentryConfig: SentryInitOptions = {
     dsn: sentryDsn,
     integrations: [nodeProfilingIntegration(), consoleIntegration()],
     tracesSampleRate: parseFloat(
@@ -19,7 +24,9 @@ if (sentryDsn) {
     enableLogs: true,
     sendDefaultPii:
       process.env["SENTRY_SEND_DEFAULT_PII"] === "true" || !isProd,
-  } as any);
+  };
+
+  Sentry.init(sentryConfig);
 
   console.log(
     `[sentry] Initialized successfully. (Mode: ${isProd ? "Production" : "Development"})`,

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { useLocation, useNavigate } from "react-router";
 import { useEffect, useMemo, useRef } from "react";
 import SessionShell from "../components/session-shell";
-import UserPrompt from "../components/conversation/user-prompt";
+import UserPrompt from "../components/chat-messages/user-prompt";
 import { useToast } from "../providers/toast";
 import apiClient from "../lib/api-client";
 import { DEFAULT_CHAT_MODEL_ID } from "@writ/shared";
@@ -36,10 +36,19 @@ export default function NewSessionScreen() {
     let shouldIgnore = false;
 
     const createSession = async () => {
+      const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
+      const safeTitle = Array.from(segmenter.segment(locationState.message))
+        .slice(0, 40)
+        .map((s) => s.segment)
+        .join("");
+
       try {
         const response = await apiClient.sessions.$post({
           json: {
-            title: locationState.message.slice(0, 100),
+            title:
+              safeTitle.length < locationState.message.length
+                ? `${safeTitle}...`
+                : safeTitle,
             cwd: process.cwd(),
             prompt: {
               role: "USER",

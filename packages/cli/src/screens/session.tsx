@@ -3,12 +3,18 @@ import SessionShell from "../components/session-shell";
 import type { InferResponseType } from "hono/client";
 import apiClient from "../lib/api-client";
 import { z } from "zod";
-import UserPrompt from "../components/conversation/user-prompt";
-import ErrorResponse from "../components/conversation/error-response";
-import AgentResponse from "../components/conversation/agent-response";
+import UserPrompt from "../components/chat-messages/user-prompt";
+import ErrorResponse from "../components/chat-messages/error-response";
+import AgentResponse from "../components/chat-messages/agent-response";
 import { useToast } from "../providers/toast";
 import { useEffect, useMemo, useState } from "react";
 import { getErrorMessage } from "../lib/utils";
+import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@writ/shared";
+import prettyMilliseconds from "pretty-ms";
+import { useChat, type Message } from "../hooks/use-chat";
+import { MessageStatus } from "@writ/db/enums";
+import { useInputStack } from "../providers/input-stack";
+import { useKeyboard } from "@opentui/react";
 
 type SessionData = InferResponseType<
   (typeof apiClient.sessions)[":id"]["$get"],
@@ -26,16 +32,119 @@ const sessionLocationStateSchema = z.object({
   ),
 });
 
-function Conversation({ msg }: { msg: SessionData["messages"][number] }) {
-  if (msg.role === "USER") {
+function formatSessionMessages(
+  sessionMessages: SessionData["messages"],
+): Message[] {
+  return sessionMessages.map((msg) => {
+    if (msg.role === "ERROR") {
+      return { id: msg.id, role: "error", content: msg.content };
+    }
+
+    if (msg.role === "USER") {
+      return {
+        id: msg.id,
+        role: "user",
+        model: msg.model as SupportedChatModelId,
+        mode: msg.mode,
+        content: msg.content,
+      };
+    }
+
+    return {
+      id: msg.id,
+      role: "agent",
+      model: msg.model as SupportedChatModelId,
+      mode: msg.mode,
+      content: msg.content,
+      blocks: [{ type: "text", text: msg.content }],
+      ...(msg.duration !== null
+        ? { duration: prettyMilliseconds(msg.duration * 1000) }
+        : {}),
+      isInterrupted: msg.status === MessageStatus.INTERRUPTED,
+    };
+  });
+}
+
+function ChatMessage({ msg }: { msg: Message }) {
+  if (msg.role === "user") {
     return <UserPrompt prompt={msg.content} />;
   }
 
-  if (msg.role === "ERROR") {
+  if (msg.role === "error") {
     return <ErrorResponse response={msg.content} />;
   }
 
-  return <AgentResponse response={msg.content} model={msg.model} />;
+  return (
+    <AgentResponse
+      isStreaming={false}
+      model={msg.model}
+      mode={msg.mode}
+      blocks={msg.blocks}
+      duration={msg.duration}
+      isInterrupted={msg.isInterrupted}
+    />
+  );
+}
+
+function SessionChat({ session }: { session: SessionData }) {
+  const [initialMessages] = useState(() =>
+    formatSessionMessages(session.messages),
+  );
+  const {
+    messages,
+    streamState,
+    handleSubmit,
+    abortAgentStream,
+    interruptGeneration,
+  } = useChat(session.id, initialMessages);
+  const { isTopLayer } = useInputStack();
+
+  // Stop pending agent stream chunks when user leaves the session (on unmount)
+  useEffect(() => {
+    return () => {
+      abortAgentStream();
+    };
+  }, [abortAgentStream]);
+
+  // Let user cancel a reply even before the first streamed chunk arrives
+  useKeyboard((key) => {
+    if (
+      key.name === "escape" &&
+      isTopLayer("base") &&
+      streamState.status === "streaming"
+    ) {
+      key.preventDefault();
+      interruptGeneration();
+    }
+  });
+
+  return (
+    <SessionShell
+      isLoading={streamState.status === "streaming"}
+      canInterrupt={streamState.status === "streaming"}
+      onSubmit={(prompt) => {
+        handleSubmit({ prompt, model: DEFAULT_CHAT_MODEL_ID, mode: "BUILD" });
+      }}
+    >
+      {messages.map((msg) => (
+        <ChatMessage key={msg.id} msg={msg} />
+      ))}
+
+      {/* Streaming response must be rendered AFTER messages so it sits at the
+          bottom of the scrollbox. stickyScroll + stickyStart="bottom" anchors
+          the viewport to the last child — if this were first, the sticky anchor
+          would land on the historical messages and never scroll up to follow the
+          stream. */}
+      {streamState.status === "streaming" && streamState.blocks.length > 0 && (
+        <AgentResponse
+          isStreaming
+          blocks={streamState.blocks}
+          model={streamState.model}
+          mode={streamState.mode}
+        />
+      )}
+    </SessionShell>
+  );
 }
 
 export default function SessionScreen() {
@@ -97,11 +206,5 @@ export default function SessionScreen() {
     return <SessionShell onSubmit={() => {}} promptAreaDisabled isLoading />;
   }
 
-  return (
-    <SessionShell onSubmit={() => {}} promptAreaDisabled>
-      {session.messages.map((msg) => (
-        <Conversation key={msg.id} msg={msg} />
-      ))}
-    </SessionShell>
-  );
+  return <SessionChat key={session.id} session={session} />;
 }
