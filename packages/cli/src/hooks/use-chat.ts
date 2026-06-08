@@ -118,10 +118,23 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
 
       let currentBlocks: MessageBlock[] = [];
 
+      if (!response.body) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "error",
+            content:
+              "Failed to establish a stream: the server response body is empty.",
+          },
+        ]);
+        return;
+      }
+
       // Pipe the raw bytes through a TextDecoder, then into the eventsource-parser
       // which cleanly extracts Server-Sent Events (SSE) boundaries
-      const responseStream = response
-        .body!.pipeThrough(new TextDecoderStream())
+      const responseStream = response.body
+        .pipeThrough(new TextDecoderStream())
         .pipeThrough(new EventSourceParserStream());
 
       // The loop pauses until the next SSE chunk arrives over the network
