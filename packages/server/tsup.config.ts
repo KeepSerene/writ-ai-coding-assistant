@@ -16,6 +16,7 @@ export default defineConfig({
     "pg",
     "@sentry/profiling-node",
     "import-in-the-middle",
+    "dotenv",
   ],
   clean: true,
   sourcemap: true,
