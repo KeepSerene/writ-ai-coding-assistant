@@ -43,6 +43,9 @@ app.get("/debug-sentry", (_c) => {
   throw new Error("My first Sentry error!");
 });
 
+// Health check
+app.get("/healthz", (c) => c.json({ status: "ok" }));
+
 const routes = app
   .route("/sessions", sessionsRouter)
   .route("/sessions/:sessionId/chat", chatRouter);
