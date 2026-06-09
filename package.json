@@ -8,7 +8,9 @@
     "dev:cli": "pnpm --filter @writ/cli dev",
     "dev:server": "pnpm --filter @writ/server dev",
     "db:generate": "pnpm --filter @writ/db db:generate",
-    "db:push": "pnpm --filter @writ/db db:push"
+    "db:push": "pnpm --filter @writ/db db:push",
+    "build:server": "pnpm --filter @writ/server build",
+    "start:server": "pnpm --filter @writ/server start"
   },
   "keywords": [],
   "author": "Dhrubajyoti Bhattacharjee",
