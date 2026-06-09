@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "tsx watch --env-file=../../.env --import ./src/instrument.ts src/index.ts",
-    "build": "tsc",
+    "build": "tsup",
     "start": "node --import ./dist/instrument.js dist/index.js"
   },
   "author": "Dhrubajyoti Bhattacharjee",
@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
+    "tsup": "8.5.1",
     "tsx": "^4.22.4"
   }
 }
