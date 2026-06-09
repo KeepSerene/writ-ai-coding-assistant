@@ -18,8 +18,9 @@
   "dependencies": {
     "@opentui/core": "^0.2.16",
     "@opentui/react": "^0.2.16",
-    "@writ/shared": "workspace:*",
     "@writ/db": "workspace:*",
+    "@writ/shared": "workspace:*",
+    "date-fns": "4.4.0",
     "dotenv": "^17.4.2",
     "eventsource-parser": "3.1.0",
     "hono": "^4.12.23",

@@ -15,18 +15,18 @@ import { useKeyboard } from "@opentui/react";
 import { useInputStack } from "../../providers/input-stack";
 import { useTheme } from "../../providers/theme";
 
-interface FilterListDialogProps<TItem> {
-  items: TItem[];
-  onSelect: (item: TItem) => void;
-  onHighlight: (item: TItem) => void;
-  filterPredicate: (item: TItem, query: string) => boolean;
-  renderItem: (item: TItem, isSelected: boolean) => ReactNode;
-  getListItemUniqueKey: (item: TItem) => string;
+interface FilterListItemsDialogProps<T> {
+  items: T[];
+  onSelect: (item: T) => void;
+  onHighlight?: (item: T) => void;
+  filterPredicate: (item: T, query: string) => boolean;
+  renderItem: (item: T, isSelected: boolean) => ReactNode;
+  getListItemUniqueKey: (item: T) => string;
   placeholder?: string;
   emptyStateText?: string;
 }
 
-function FilterListDialog<TItem>({
+function FilterListItemsDialog<T>({
   items,
   onSelect,
   onHighlight,
@@ -35,7 +35,7 @@ function FilterListDialog<TItem>({
   getListItemUniqueKey,
   placeholder = "Search",
   emptyStateText = "No results found",
-}: FilterListDialogProps<TItem>) {
+}: FilterListItemsDialogProps<T>) {
   const [selectedItemIndex, setSelectedItemIndex] = useState(0);
   const [searchValue, setSearchValue] = useState("");
 
@@ -189,4 +189,4 @@ function FilterListDialog<TItem>({
   );
 }
 
-export default FilterListDialog;
+export default FilterListItemsDialog;
