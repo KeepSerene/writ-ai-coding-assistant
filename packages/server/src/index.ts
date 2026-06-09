@@ -43,7 +43,7 @@ app.get("/debug-sentry", (_c) => {
   throw new Error("My first Sentry error!");
 });
 
-// Health check
+// Health check route (for Render.com)
 app.get("/healthz", (c) => c.json({ status: "ok" }));
 
 const routes = app
