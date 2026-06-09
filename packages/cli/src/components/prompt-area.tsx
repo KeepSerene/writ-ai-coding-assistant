@@ -3,13 +3,16 @@ import { SPLIT_BORDER_CONFIG, TEXTAREA_KEY_BINDINGS } from "../lib/constants";
 import CommandMenu from "./command-menu";
 import SessionContext from "./session-context";
 import type { TextareaRenderable } from "@opentui/core";
-import { useRenderer } from "@opentui/react";
+import { useKeyboard, useRenderer } from "@opentui/react";
 import useCommandMenu from "../hooks/use-command-menu";
 import type { CommandMenuItem } from "./command-menu/types";
 import { useToast } from "../providers/toast";
 import { useInputStack } from "../providers/input-stack";
 import { useDialog } from "../providers/dialog";
 import { useTheme } from "../providers/theme";
+import { useNavigate } from "react-router";
+import { useSessionCtx } from "../providers/session-context";
+import { Mode } from "@writ/db/enums";
 
 interface PromptAreaProps {
   onSubmit: (prompt: string) => void;
@@ -26,6 +29,8 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
   const {
     currentTheme: { colors },
   } = useTheme();
+  const navigate = useNavigate();
+  const { mode, setMode, toggleMode, setModel } = useSessionCtx();
 
   const {
     cmdQuery,
@@ -50,12 +55,16 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
           exit: () => renderer.destroy(),
           toast,
           dialog,
+          navigate,
+          mode,
+          setMode,
+          setModel,
         });
       } else {
         textarea.insertText(cmdItem.command + " ");
       }
     },
-    [renderer, toast, dialog],
+    [renderer, toast, dialog, navigate, mode, setMode, setModel],
   );
 
   const executeCmdItem = useCallback(
@@ -126,12 +135,21 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
     handleInputChange(textarea.plainText);
   }, [handleInputChange]);
 
+  useKeyboard((key) => {
+    if (disabled || !isTopLayer("base")) return;
+
+    if (key.name === "tab") {
+      key.preventDefault();
+      toggleMode();
+    }
+  });
+
   return (
     <box width="100%" alignItems="center">
       <box
         width="100%"
         border={["left"]}
-        borderColor={colors.primary}
+        borderColor={mode === Mode.BUILD ? colors.primary : colors.secondary}
         customBorderChars={{
           ...SPLIT_BORDER_CONFIG.customBorderChars,
           bottomLeft: "╹",

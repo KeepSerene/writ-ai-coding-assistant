@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef } from "react";
 import { useDialog } from "../../providers/dialog";
 import { useTheme } from "../../providers/theme";
 import { THEMES, type Theme } from "../../lib/themes";
-import FilterListDialog from "./filter-list";
+import FilterListItemsDialog from "./filter-list-items";
 
-export default function ThemeDialog() {
+export default function ThemesDialog() {
   const { currentTheme, setTheme } = useTheme();
   const dialog = useDialog();
 
@@ -38,12 +38,12 @@ export default function ThemeDialog() {
   );
 
   return (
-    <FilterListDialog
+    <FilterListItemsDialog
       items={THEMES}
       onSelect={handleSelect}
       onHighlight={handleHighlight}
       filterPredicate={(theme, query) =>
-        theme.name.toLowerCase().includes(query.toLowerCase())
+        theme.name.toLowerCase().includes(query.trim().toLowerCase())
       }
       renderItem={(theme, isSelected) => (
         <text

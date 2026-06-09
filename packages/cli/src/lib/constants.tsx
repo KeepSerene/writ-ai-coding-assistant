@@ -1,6 +1,10 @@
 import type { KeyBinding } from "@opentui/core";
 import type { CommandMenuItem } from "../components/command-menu/types";
-import ThemeDialog from "../components/dialogs/theme";
+import ThemesDialog from "../components/dialogs/themes";
+import SessionsDialog from "../components/dialogs/sessions";
+import ModesDialog from "../components/dialogs/modes";
+import ModelsDialog from "../components/dialogs/models";
+import { SUPPORTED_CHAT_MODELS } from "@writ/shared";
 
 export const EMPTY_BORDER_CONFIG = {
   topLeft: "",
@@ -37,17 +41,19 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
     description: "Start a new conversation",
     command: "/new",
     action: (ctx) => {
-      ctx.toast.show({ message: "Starting new conversation..." });
+      ctx.navigate("/");
     },
   },
   {
-    name: "agents",
-    description: "Switch agents",
-    command: "/agents",
+    name: "modes",
+    description: "Switch modes",
+    command: "/modes",
     action: (ctx) => {
       ctx.dialog.open({
-        title: "Select Mode",
-        children: <text>Agent selection coming soon...</text>,
+        title: "Modes",
+        children: (
+          <ModesDialog currentMode={ctx.mode} onSelectMode={ctx.setMode} />
+        ),
       });
     },
   },
@@ -57,8 +63,13 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
     command: "/models",
     action: (ctx) => {
       ctx.dialog.open({
-        title: "Select Model",
-        children: <text>Model selection coming soon...</text>,
+        title: "Models",
+        children: (
+          <ModelsDialog
+            models={SUPPORTED_CHAT_MODELS.map((m) => m.id)}
+            onSelectModel={ctx.setModel}
+          />
+        ),
       });
     },
   },
@@ -67,7 +78,10 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
     description: "Browse past sessions",
     command: "/sessions",
     action: (ctx) => {
-      ctx.toast.show({ message: "Loading sessions..." });
+      ctx.dialog.open({
+        title: "Sessions",
+        children: <SessionsDialog />,
+      });
     },
   },
   {
@@ -76,8 +90,8 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
     command: "/themes",
     action: (ctx) => {
       ctx.dialog.open({
-        title: "Pick Theme",
-        children: <ThemeDialog />,
+        title: "Themes",
+        children: <ThemesDialog />,
       });
     },
   },

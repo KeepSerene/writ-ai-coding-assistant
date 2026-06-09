@@ -1,8 +1,10 @@
+import "opentui-spinner/react";
 import type { ReactNode } from "react";
 import PromptArea from "./prompt-area";
 import { TextAttributes } from "@opentui/core";
 import { useTheme } from "../providers/theme";
-import Loader from "./loader";
+import { useSessionCtx } from "../providers/session-context";
+import { Mode } from "@writ/db/enums";
 
 interface SessionShellProps {
   children?: ReactNode;
@@ -22,6 +24,7 @@ function SessionShell({
   const {
     currentTheme: { colors },
   } = useTheme();
+  const { mode } = useSessionCtx();
 
   return (
     <box
@@ -54,7 +57,10 @@ function SessionShell({
       >
         {isLoading && (
           <box flexDirection="row" alignItems="center" gap={2}>
-            <Loader />
+            <spinner
+              name="aesthetic"
+              color={mode === Mode.BUILD ? colors.primary : colors.secondary}
+            />
 
             {canInterrupt && (
               <text fg={colors.onBackground}>Esc to interrupt</text>
