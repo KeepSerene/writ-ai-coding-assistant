@@ -5,9 +5,11 @@ import { TextAttributes } from "@opentui/core";
 import { useTheme } from "../providers/theme";
 import { useSessionCtx } from "../providers/session-context";
 import { Mode } from "@writ/db/enums";
+import { SPLIT_BORDER_CONFIG } from "../lib/constants";
 
 interface SessionShellProps {
   children?: ReactNode;
+  title?: string;
   onSubmit: (prompt: string) => void;
   promptAreaDisabled?: boolean;
   isLoading?: boolean;
@@ -16,6 +18,7 @@ interface SessionShellProps {
 
 function SessionShell({
   children,
+  title,
   onSubmit,
   promptAreaDisabled = false,
   isLoading = false,
@@ -36,6 +39,23 @@ function SessionShell({
       flexDirection="column"
       gap={1}
     >
+      {title && (
+        <box
+          flexShrink={0}
+          width="100%"
+          border={["left"]}
+          borderColor={colors.onBackground}
+          customBorderChars={{
+            ...SPLIT_BORDER_CONFIG.customBorderChars,
+            bottomLeft: "╹",
+          }}
+          paddingX={1}
+          zIndex={50}
+        >
+          <text fg={colors.onBackground}>{title}</text>
+        </box>
+      )}
+
       {children && (
         <scrollbox flexGrow={1} width="100%" stickyScroll stickyStart="bottom">
           <box gap={1}>{children}</box>
@@ -70,8 +90,9 @@ function SessionShell({
 
         <box marginLeft="auto" flexShrink={0} flexDirection="row" gap={1}>
           <text fg={colors.onBackground}>Tab</text>
+
           <text attributes={TextAttributes.DIM} fg={colors.onBackground}>
-            agents
+            &rsaquo; modes
           </text>
         </box>
       </box>

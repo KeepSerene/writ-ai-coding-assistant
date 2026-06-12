@@ -4,7 +4,6 @@ import { join } from "node:path";
 export interface ThemeColors {
   background: string;
   onBackground: string;
-  text: string;
   surface: string;
   onSurface: string;
   dialog: string;
@@ -18,7 +17,6 @@ export interface ThemeColors {
   selection: string;
   onSelection: string;
   border: string;
-  borderFocus: string;
   success: string;
   onSuccess: string;
   error: string;
@@ -38,7 +36,6 @@ export const THEMES: Theme[] = [
   {
     name: "Nightfox",
     colors: {
-      text: "#cdcecf",
       background: "#192330",
       onBackground: "#cdcecf",
       surface: "#131a24",
@@ -54,7 +51,6 @@ export const THEMES: Theme[] = [
       selection: "#394b70",
       onSelection: "#cdcecf",
       border: "#393b44",
-      borderFocus: "#81b29a",
       success: "#81b29a",
       onSuccess: "#192330",
       error: "#c94f6d",
@@ -68,7 +64,6 @@ export const THEMES: Theme[] = [
   {
     name: "Catppuccin Mocha",
     colors: {
-      text: "#cdd6f4",
       background: "#1e1e2e",
       onBackground: "#cdd6f4",
       surface: "#181825",
@@ -84,7 +79,6 @@ export const THEMES: Theme[] = [
       selection: "#585b70",
       onSelection: "#cdd6f4",
       border: "#45475a",
-      borderFocus: "#cba6f7",
       success: "#a6e3a1",
       onSuccess: "#1e1e2e",
       error: "#f38ba8",
@@ -98,7 +92,6 @@ export const THEMES: Theme[] = [
   {
     name: "Dracula",
     colors: {
-      text: "#f8f8f2",
       background: "#282a36",
       onBackground: "#f8f8f2",
       surface: "#21222c",
@@ -114,7 +107,6 @@ export const THEMES: Theme[] = [
       selection: "#373a4d",
       onSelection: "#f8f8f2",
       border: "#6272a4",
-      borderFocus: "#bd93f9",
       success: "#50fa7b",
       onSuccess: "#282a36",
       error: "#ff5555",
@@ -128,7 +120,6 @@ export const THEMES: Theme[] = [
   {
     name: "Nord",
     colors: {
-      text: "#d8dee9",
       background: "#2e3440",
       onBackground: "#d8dee9",
       surface: "#242933",
@@ -144,7 +135,6 @@ export const THEMES: Theme[] = [
       selection: "#4c566a",
       onSelection: "#eceff4",
       border: "#434c5e",
-      borderFocus: "#88c0d0",
       success: "#a3be8c",
       onSuccess: "#2e3440",
       error: "#bf616a",
@@ -158,7 +148,6 @@ export const THEMES: Theme[] = [
   {
     name: "Gruvbox Dark",
     colors: {
-      text: "#ebdbb2",
       background: "#282828",
       onBackground: "#ebdbb2",
       surface: "#1d2021",
@@ -174,7 +163,6 @@ export const THEMES: Theme[] = [
       selection: "#504945",
       onSelection: "#ebdbb2",
       border: "#665c54",
-      borderFocus: "#d79921",
       success: "#b8bb26",
       onSuccess: "#282828",
       error: "#cc241d",
@@ -188,7 +176,6 @@ export const THEMES: Theme[] = [
   {
     name: "Tokyo Night",
     colors: {
-      text: "#a9b1d6",
       background: "#1a1b26",
       onBackground: "#a9b1d6",
       surface: "#16161e",
@@ -204,7 +191,6 @@ export const THEMES: Theme[] = [
       selection: "#33467c",
       onSelection: "#c0caf5",
       border: "#3b4261",
-      borderFocus: "#7aa2f7",
       success: "#9ece6a",
       onSuccess: "#1a1b26",
       error: "#f7768e",
@@ -218,7 +204,6 @@ export const THEMES: Theme[] = [
   {
     name: "One Dark",
     colors: {
-      text: "#abb2bf",
       background: "#282c34",
       onBackground: "#abb2bf",
       surface: "#21252b",
@@ -234,7 +219,6 @@ export const THEMES: Theme[] = [
       selection: "#2c3040",
       onSelection: "#abb2bf",
       border: "#545862",
-      borderFocus: "#61afef",
       success: "#98c379",
       onSuccess: "#282c34",
       error: "#e06c75",
@@ -248,7 +232,6 @@ export const THEMES: Theme[] = [
   {
     name: "Monokai",
     colors: {
-      text: "#f8f8f2",
       background: "#272822",
       onBackground: "#f8f8f2",
       surface: "#1e1f1c",
@@ -264,7 +247,6 @@ export const THEMES: Theme[] = [
       selection: "#49483e",
       onSelection: "#f8f8f2",
       border: "#75715e",
-      borderFocus: "#fd971f",
       success: "#a6e22e",
       onSuccess: "#272822",
       error: "#f92672",
@@ -278,7 +260,6 @@ export const THEMES: Theme[] = [
   {
     name: "Rosé Pine",
     colors: {
-      text: "#e0def4",
       background: "#191724",
       onBackground: "#e0def4",
       surface: "#1f1d2e",
@@ -294,7 +275,6 @@ export const THEMES: Theme[] = [
       selection: "#403d52",
       onSelection: "#e0def4",
       border: "#44415a",
-      borderFocus: "#c4a7e7",
       success: "#9ccfd8",
       onSuccess: "#191724",
       error: "#eb6f92",
@@ -308,7 +288,6 @@ export const THEMES: Theme[] = [
   {
     name: "Kanagawa",
     colors: {
-      text: "#dcd7ba",
       background: "#1f1f28",
       onBackground: "#dcd7ba",
       surface: "#16161d",
@@ -324,7 +303,6 @@ export const THEMES: Theme[] = [
       selection: "#2d4f67",
       onSelection: "#dcd7ba",
       border: "#54546d",
-      borderFocus: "#7e9cd8",
       success: "#98bb6c",
       onSuccess: "#1f1f28",
       error: "#e82424",
@@ -338,7 +316,6 @@ export const THEMES: Theme[] = [
   {
     name: "Everforest Dark",
     colors: {
-      text: "#d3c6aa",
       background: "#2b3339",
       onBackground: "#d3c6aa",
       surface: "#232a2e",
@@ -354,7 +331,6 @@ export const THEMES: Theme[] = [
       selection: "#503946",
       onSelection: "#d3c6aa",
       border: "#4a5057",
-      borderFocus: "#a7c080",
       success: "#a7c080",
       onSuccess: "#2b3339",
       error: "#e67e80",
@@ -368,7 +344,6 @@ export const THEMES: Theme[] = [
   {
     name: "Ayu Dark",
     colors: {
-      text: "#b3b1ad",
       background: "#0a0e14",
       onBackground: "#b3b1ad",
       surface: "#01060e",
@@ -384,7 +359,6 @@ export const THEMES: Theme[] = [
       selection: "#273747",
       onSelection: "#b3b1ad",
       border: "#3d424d",
-      borderFocus: "#39bae6",
       success: "#c2d94c",
       onSuccess: "#0a0e14",
       error: "#ff3333",
@@ -398,7 +372,6 @@ export const THEMES: Theme[] = [
   {
     name: "Solarized Dark",
     colors: {
-      text: "#839496",
       background: "#002b36",
       onBackground: "#839496",
       surface: "#001e26",
@@ -414,7 +387,6 @@ export const THEMES: Theme[] = [
       selection: "#586e75",
       onSelection: "#fdf6e3",
       border: "#657b83",
-      borderFocus: "#268bd2",
       success: "#859900",
       onSuccess: "#fdf6e3",
       error: "#dc322f",
@@ -428,7 +400,6 @@ export const THEMES: Theme[] = [
   {
     name: "GitHub Dark",
     colors: {
-      text: "#c9d1d9",
       background: "#0d1117",
       onBackground: "#c9d1d9",
       surface: "#010409",
@@ -444,7 +415,6 @@ export const THEMES: Theme[] = [
       selection: "#1f6feb",
       onSelection: "#ffffff",
       border: "#30363d",
-      borderFocus: "#58a6ff",
       success: "#238636",
       onSuccess: "#ffffff",
       error: "#da3633",
@@ -458,7 +428,6 @@ export const THEMES: Theme[] = [
   {
     name: "Synthwave '84",
     colors: {
-      text: "#f92aad",
       background: "#262335",
       onBackground: "#f92aad",
       surface: "#1a1825",
@@ -474,7 +443,6 @@ export const THEMES: Theme[] = [
       selection: "#3c355a",
       onSelection: "#f92aad",
       border: "#495495",
-      borderFocus: "#f92aad",
       success: "#72f1b8",
       onSuccess: "#262335",
       error: "#fe4450",

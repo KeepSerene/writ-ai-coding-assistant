@@ -3,14 +3,17 @@ import { useDialog } from "../../providers/dialog";
 import FilterListItemsDialog from "./filter-list-items";
 import { useTheme } from "../../providers/theme";
 import type { SupportedChatModelId } from "@writ/shared";
+import { getModelLabel } from "../../lib/utils";
 
 interface ModelsDialogProps {
   models: SupportedChatModelId[];
+  currentModel: SupportedChatModelId;
   onSelectModel: (model: SupportedChatModelId) => void;
 }
 
 export default function ModelsDialog({
   models,
+  currentModel,
   onSelectModel,
 }: ModelsDialogProps) {
   const dialog = useDialog();
@@ -38,14 +41,14 @@ export default function ModelsDialog({
           selectable={false}
           fg={isSelected ? colors.onSelection : colors.onDialog}
         >
-          {/* {TODO: selectModelCondition ? "• " : "» "} */}
-          {/* TODO: Display model labels instead */}
-          {model}
+          {model === currentModel ? "• " : "» "}
+          {getModelLabel(model)}
         </text>
       )}
       getListItemUniqueKey={(model) => model}
       placeholder="Search model"
       emptyStateText="No matching models"
+      onEscape={dialog.close}
     />
   );
 }

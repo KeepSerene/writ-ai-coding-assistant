@@ -3,18 +3,21 @@ import SessionShell from "../components/session-shell";
 import type { InferResponseType } from "hono/client";
 import apiClient from "../lib/api-client";
 import { z } from "zod";
-import UserPrompt from "../components/chat-messages/user-prompt";
-import ErrorResponse from "../components/chat-messages/error-response";
-import AgentResponse from "../components/chat-messages/agent-response";
 import { useToast } from "../providers/toast";
 import { useEffect, useMemo, useState } from "react";
 import { getErrorMessage } from "../lib/utils";
-import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@writ/shared";
+import { messageContentSchema, type SupportedChatModelId } from "@writ/shared";
 import prettyMilliseconds from "pretty-ms";
-import { useChat, type Message } from "../hooks/use-chat";
+import { useChat, type Message, type UIMessageBlock } from "../hooks/use-chat";
 import { MessageStatus } from "@writ/db/enums";
 import { useInputStack } from "../providers/input-stack";
 import { useKeyboard } from "@opentui/react";
+import { useSessionCtx } from "../providers/session-context";
+import {
+  AgentResponse,
+  ErrorResponse,
+  UserPrompt,
+} from "../components/chat-messages";
 
 type SessionData = InferResponseType<
   (typeof apiClient.sessions)[":id"]["$get"],
@@ -50,13 +53,23 @@ function formatSessionMessages(
       };
     }
 
+    const parsedContent =
+      msg.blocks != null ? messageContentSchema.safeParse(msg.blocks) : null;
+    const blocks: UIMessageBlock[] = parsedContent?.success
+      ? parsedContent.data.map((block) =>
+          block.type === "tool-use"
+            ? { ...block, status: "done" as const }
+            : block,
+        )
+      : [];
+
     return {
       id: msg.id,
       role: "agent",
       model: msg.model as SupportedChatModelId,
       mode: msg.mode,
       content: msg.content,
-      blocks: [{ type: "text", text: msg.content }],
+      blocks,
       ...(msg.duration !== null
         ? { duration: prettyMilliseconds(msg.duration * 1000) }
         : {}),
@@ -67,7 +80,7 @@ function formatSessionMessages(
 
 function ChatMessage({ msg }: { msg: Message }) {
   if (msg.role === "user") {
-    return <UserPrompt prompt={msg.content} />;
+    return <UserPrompt prompt={msg.content} mode={msg.mode} />;
   }
 
   if (msg.role === "error") {
@@ -87,6 +100,7 @@ function ChatMessage({ msg }: { msg: Message }) {
 }
 
 function SessionChat({ session }: { session: SessionData }) {
+  const [title, setTitle] = useState(session.title);
   const [initialMessages] = useState(() =>
     formatSessionMessages(session.messages),
   );
@@ -98,6 +112,40 @@ function SessionChat({ session }: { session: SessionData }) {
     interruptGeneration,
   } = useChat(session.id, initialMessages);
   const { isTopLayer } = useInputStack();
+  const { model, mode } = useSessionCtx();
+
+  // Generate a real title only for brand-new sessions: exactly 1 message, USER role.
+  useEffect(() => {
+    const firstMsg = session.messages[0];
+
+    if (session.messages.length !== 1 || firstMsg?.role !== "USER") return;
+
+    let shouldIgnore = false;
+
+    const fetchTitle = async () => {
+      try {
+        const res = await apiClient.sessions[":id"].title.$post({
+          param: { id: session.id },
+          json: { prompt: firstMsg.content },
+        });
+
+        // Abort state update if component unmounted or request failed
+        if (shouldIgnore || !res.ok) return;
+
+        const data = await res.json();
+        if (data.title) setTitle(data.title);
+      } catch (error) {
+        console.error("Failed to fetch title:", error);
+        // Swallow
+      }
+    };
+
+    fetchTitle();
+
+    return () => {
+      shouldIgnore = true;
+    };
+  }, []);
 
   // Stop pending agent stream chunks when user leaves the session (on unmount)
   useEffect(() => {
@@ -120,10 +168,11 @@ function SessionChat({ session }: { session: SessionData }) {
 
   return (
     <SessionShell
+      title={title}
       isLoading={streamState.status === "streaming"}
       canInterrupt={streamState.status === "streaming"}
       onSubmit={(prompt) => {
-        handleSubmit({ prompt, model: DEFAULT_CHAT_MODEL_ID, mode: "BUILD" });
+        handleSubmit({ prompt, model, mode });
       }}
     >
       {messages.map((msg) => (

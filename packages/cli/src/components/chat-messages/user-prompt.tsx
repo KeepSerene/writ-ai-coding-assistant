@@ -1,7 +1,8 @@
+import { Mode } from "@writ/db/enums";
 import { SPLIT_BORDER_CONFIG } from "../../lib/constants";
 import { useTheme } from "../../providers/theme";
 
-function UserPrompt({ prompt }: { prompt: string }) {
+function UserPrompt({ prompt, mode }: { prompt: string; mode: Mode }) {
   const {
     currentTheme: { colors },
   } = useTheme();
@@ -11,7 +12,7 @@ function UserPrompt({ prompt }: { prompt: string }) {
       <box
         width="100%"
         border={["left"]}
-        borderColor={colors.primary}
+        borderColor={mode === Mode.BUILD ? colors.primary : colors.secondary}
         customBorderChars={{
           ...SPLIT_BORDER_CONFIG.customBorderChars,
           bottomLeft: "╹",

@@ -1,10 +1,12 @@
 import type { KeyBinding } from "@opentui/core";
 import type { CommandMenuItem } from "../components/command-menu/types";
-import ThemesDialog from "../components/dialogs/themes";
-import SessionsDialog from "../components/dialogs/sessions";
-import ModesDialog from "../components/dialogs/modes";
-import ModelsDialog from "../components/dialogs/models";
 import { SUPPORTED_CHAT_MODELS } from "@writ/shared";
+import {
+  ModelsDialog,
+  ModesDialog,
+  SessionsDialog,
+  ThemesDialog,
+} from "../components/dialogs";
 
 export const EMPTY_BORDER_CONFIG = {
   topLeft: "",
@@ -67,6 +69,7 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
         children: (
           <ModelsDialog
             models={SUPPORTED_CHAT_MODELS.map((m) => m.id)}
+            currentModel={ctx.model}
             onSelectModel={ctx.setModel}
           />
         ),

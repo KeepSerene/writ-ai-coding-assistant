@@ -49,6 +49,7 @@ export default function ModesDialog({
       getListItemUniqueKey={(mode) => mode}
       placeholder="Select mode"
       emptyStateText="No matching modes"
+      onEscape={dialog.close}
     />
   );
 }

@@ -10,6 +10,7 @@ export interface CommandContext {
   navigate: (path: string) => void;
   mode: Mode;
   setMode: (mode: Mode) => void;
+  model: SupportedChatModelId;
   setModel: (model: SupportedChatModelId) => void;
 }
 

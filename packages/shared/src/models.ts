@@ -3,21 +3,35 @@ export interface ModelPricing {
   outputUsdPerMillionTokens: number;
 }
 
-export type SupportedProvider = "google" | "groq";
+export type SupportedProvider =
+  | "google"
+  | "groq"
+  | "mistral"
+  | "cerebras"
+  | "nim";
 
 interface SupportedChatModelDefinition {
   id: string;
   provider: SupportedProvider;
-  pricing: ModelPricing;
   label: string;
+  pricing: ModelPricing;
 }
 
 export const SUPPORTED_CHAT_MODELS = [
   // Gemini models
   {
-    id: "gemini-2.5-flash-lite-preview-06-17",
+    id: "gemini-3.5-flash",
     provider: "google",
-    label: "Gemini 2.5 Flash Lite",
+    label: "Gemini 3.5 Flash",
+    pricing: {
+      inputUsdPerMillionTokens: 0.075,
+      outputUsdPerMillionTokens: 0.3,
+    },
+  },
+  {
+    id: "gemini-3.1-flash-lite",
+    provider: "google",
+    label: "Gemini 3.1 Flash Lite",
     pricing: {
       inputUsdPerMillionTokens: 0.018,
       outputUsdPerMillionTokens: 0.072,
@@ -32,51 +46,67 @@ export const SUPPORTED_CHAT_MODELS = [
       outputUsdPerMillionTokens: 0.3,
     },
   },
-  {
-    id: "gemini-2.5-pro",
-    provider: "google",
-    label: "Gemini 2.5 Pro",
-    pricing: {
-      inputUsdPerMillionTokens: 1.25,
-      outputUsdPerMillionTokens: 10,
-    },
-  },
   // Groq models
   {
-    id: "llama-3.1-8b-instant",
+    id: "openai/gpt-oss-120b",
     provider: "groq",
-    label: "Llama 3.1 8B (Groq)",
+    label: "GPT OSS 120B (Groq)",
     pricing: {
-      inputUsdPerMillionTokens: 0.05,
-      outputUsdPerMillionTokens: 0.08,
+      inputUsdPerMillionTokens: 0.15,
+      outputUsdPerMillionTokens: 0.6,
     },
   },
   {
-    id: "llama-3.3-70b-versatile",
+    id: "openai/gpt-oss-20b",
     provider: "groq",
-    label: "Llama 3.3 70B (Groq)",
+    label: "GPT OSS 20B (Groq)",
     pricing: {
-      inputUsdPerMillionTokens: 0.59,
-      outputUsdPerMillionTokens: 0.79,
+      inputUsdPerMillionTokens: 0.075,
+      outputUsdPerMillionTokens: 0.3,
     },
   },
   {
-    id: "deepseek-r1-distill-llama-70b",
+    id: "qwen/qwen3-32b",
     provider: "groq",
-    label: "DeepSeek R1 Distill 70B (Groq)",
+    label: "Qwen3 32B (Groq)",
     pricing: {
-      inputUsdPerMillionTokens: 0.75,
-      outputUsdPerMillionTokens: 0.99,
+      inputUsdPerMillionTokens: 0.29,
+      outputUsdPerMillionTokens: 0.59,
     },
   },
+  // Mistral models
   {
-    id: "gemma2-9b-it",
-    provider: "groq",
-    label: "Gemma 2 9B IT (Groq)",
-    pricing: {
-      inputUsdPerMillionTokens: 0.2,
-      outputUsdPerMillionTokens: 0.2,
-    },
+    id: "devstral-latest",
+    provider: "mistral",
+    label: "Devstral (Mistral)",
+    pricing: { inputUsdPerMillionTokens: 0.4, outputUsdPerMillionTokens: 2.0 },
+  },
+  {
+    id: "mistral-small-latest",
+    provider: "mistral",
+    label: "Mistral Small (Mistral)",
+    pricing: { inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.3 },
+  },
+  // Cerebras models
+  {
+    id: "gpt-oss-120b",
+    provider: "cerebras",
+    label: "GPT OSS 120B (Cerebras)",
+    pricing: { inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
+  },
+  {
+    id: "zai-glm-4.7",
+    provider: "cerebras",
+    label: "GLM 4.7 (Cerebras)",
+    pricing: { inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
+  },
+
+  // NVIDIA NIM models
+  {
+    id: "moonshotai/kimi-k2.6",
+    provider: "nim",
+    label: "Kimi K2.6 (NVIDIA NIM)",
+    pricing: { inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
   },
 ] as const satisfies readonly SupportedChatModelDefinition[];
 
@@ -87,7 +117,7 @@ export const SUPPORTED_CHAT_MODEL_IDS = SUPPORTED_CHAT_MODELS.map(
   (m) => m.id,
 ) as [SupportedChatModelId, ...SupportedChatModelId[]];
 
-export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "gemini-2.5-flash";
+export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "gemini-3.5-flash";
 
 export function findSupportedChatModel(modelId: string) {
   return SUPPORTED_CHAT_MODELS.find((model) => model.id === modelId);
