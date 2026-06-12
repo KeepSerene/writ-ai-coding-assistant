@@ -2,6 +2,7 @@ import { TextAttributes } from "@opentui/core";
 import { useTheme } from "../providers/theme";
 import { useSessionCtx } from "../providers/session-context";
 import { Mode } from "@writ/db/enums";
+import { getModelLabel } from "../lib/utils";
 
 function SessionContext() {
   const { mode, model } = useSessionCtx();
@@ -19,7 +20,7 @@ function SessionContext() {
         &rsaquo;
       </text>
 
-      <text fg={colors.text}>{model}</text>
+      <text fg={colors.onSurface}>{getModelLabel(model)}</text>
     </box>
   );
 }

@@ -30,7 +30,7 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
     currentTheme: { colors },
   } = useTheme();
   const navigate = useNavigate();
-  const { mode, setMode, toggleMode, setModel } = useSessionCtx();
+  const { mode, setMode, toggleMode, model, setModel } = useSessionCtx();
 
   const {
     cmdQuery,
@@ -58,13 +58,14 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
           navigate,
           mode,
           setMode,
+          model,
           setModel,
         });
       } else {
         textarea.insertText(cmdItem.command + " ");
       }
     },
-    [renderer, toast, dialog, navigate, mode, setMode, setModel],
+    [renderer, toast, dialog, navigate, mode, setMode, model, setModel],
   );
 
   const executeCmdItem = useCallback(

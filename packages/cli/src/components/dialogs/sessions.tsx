@@ -116,6 +116,7 @@ function SessionsDialog() {
       getListItemUniqueKey={(session) => session.id}
       placeholder="Find session"
       emptyStateText="No matching sessions"
+      onEscape={close}
     />
   );
 }

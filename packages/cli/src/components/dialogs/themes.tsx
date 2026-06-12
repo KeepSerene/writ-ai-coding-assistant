@@ -61,6 +61,7 @@ export default function ThemesDialog() {
       getListItemUniqueKey={(theme) => theme.name}
       placeholder="Search theme"
       emptyStateText="No matching themes"
+      onEscape={dialog.close}
     />
   );
 }

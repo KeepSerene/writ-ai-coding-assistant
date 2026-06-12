@@ -24,6 +24,7 @@ interface FilterListItemsDialogProps<T> {
   getListItemUniqueKey: (item: T) => string;
   placeholder?: string;
   emptyStateText?: string;
+  onEscape?: () => void;
 }
 
 function FilterListItemsDialog<T>({
@@ -35,6 +36,7 @@ function FilterListItemsDialog<T>({
   getListItemUniqueKey,
   placeholder = "Search",
   emptyStateText = "No results found",
+  onEscape,
 }: FilterListItemsDialogProps<T>) {
   const [selectedItemIndex, setSelectedItemIndex] = useState(0);
   const [searchValue, setSearchValue] = useState("");
@@ -99,6 +101,11 @@ function FilterListItemsDialog<T>({
 
   useKeyboard((key) => {
     if (!isTopLayer("dialog") && !isTopLayer("text-field")) return;
+
+    if (key.name === "escape") {
+      if (onEscape) onEscape();
+      return;
+    }
 
     if (key.name === "return" || key.name === "enter") {
       const selectedItem = filteredItems[selectedItemIndex];

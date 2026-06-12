@@ -5,10 +5,15 @@ import SessionShell from "../components/session-shell";
 import UserPrompt from "../components/chat-messages/user-prompt";
 import { useToast } from "../providers/toast";
 import apiClient from "../lib/api-client";
-import { DEFAULT_CHAT_MODEL_ID } from "@writ/shared";
+import { SUPPORTED_CHAT_MODEL_IDS } from "@writ/shared";
 import { getErrorMessage } from "../lib/utils";
+import { Mode } from "@writ/db/enums";
 
-const newSessionLocationStateSchema = z.object({ message: z.string() });
+const newSessionLocationStateSchema = z.object({
+  model: z.enum(SUPPORTED_CHAT_MODEL_IDS),
+  mode: z.enum(Mode),
+  message: z.string(),
+});
 
 export default function NewSessionScreen() {
   const navigate = useNavigate();
@@ -36,25 +41,16 @@ export default function NewSessionScreen() {
     let shouldIgnore = false;
 
     const createSession = async () => {
-      const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
-      const safeTitle = Array.from(segmenter.segment(locationState.message))
-        .slice(0, 40)
-        .map((s) => s.segment)
-        .join("");
-
       try {
         const response = await apiClient.sessions.$post({
           json: {
-            title:
-              safeTitle.length < locationState.message.length
-                ? `${safeTitle}...`
-                : safeTitle,
+            title: "New session",
             cwd: process.cwd(),
             prompt: {
               role: "USER",
+              model: locationState.model,
+              mode: locationState.mode,
               content: locationState.message,
-              mode: "BUILD",
-              model: DEFAULT_CHAT_MODEL_ID,
             },
           },
         });
@@ -95,7 +91,7 @@ export default function NewSessionScreen() {
 
   return (
     <SessionShell onSubmit={() => {}} promptAreaDisabled isLoading>
-      <UserPrompt prompt={locationState.message} />
+      <UserPrompt prompt={locationState.message} mode={locationState.mode} />
     </SessionShell>
   );
 }

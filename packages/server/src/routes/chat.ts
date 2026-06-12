@@ -2,15 +2,29 @@ import { MessageStatus, Mode } from "@writ/db/enums";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import {
+  messageContentSchema,
   SUPPORTED_CHAT_MODEL_IDS,
+  toolInputSchema,
   type AgentStreamEvent,
+  type MessageBlock,
   type SupportedChatModelId,
 } from "@writ/shared";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import { isChatModelSupported, resolveModel } from "../lib/model-resolver";
-import { streamText } from "ai";
+import {
+  stepCountIs,
+  streamText,
+  type JSONValue,
+  type ModelMessage,
+  type TextPart,
+  type ToolCallPart,
+  type ToolResultPart,
+} from "ai";
 import { db } from "@writ/db/client";
 import { Hono } from "hono";
+import type { Prisma } from "@writ/db";
+import createTools from "../tools";
+import buildSystemPrompt from "../lib/system-prompt";
 
 const chatReqSchema = z.object({
   content: z.string(),
@@ -31,19 +45,101 @@ interface HistoryMessage {
   role: "USER" | "AGENT" | "ERROR";
   status: MessageStatus;
   content: string;
+  blocks: Prisma.JsonValue | null;
 }
 
-function buildChatHistory(messages: HistoryMessage[]) {
+function buildChatHistory(messages: HistoryMessage[]): ModelMessage[] {
   return messages.flatMap((msg) => {
     if (msg.role === "ERROR") return [];
-    if (msg.role === "AGENT" && msg.content.length === 0) return [];
 
-    return [
-      {
-        role: msg.role === "USER" ? ("user" as const) : ("assistant" as const),
-        content: msg.content,
-      },
-    ];
+    if (msg.role === "USER") {
+      return [{ role: "user", content: msg.content }];
+    }
+
+    if (msg.role === "AGENT") {
+      // Legacy messages with no block data
+      if (!msg.blocks) {
+        if (!msg.content) return [];
+
+        return [{ role: "assistant", content: msg.content }];
+      }
+
+      const parsed = messageContentSchema.safeParse(msg.blocks);
+
+      if (!parsed.success) {
+        if (!msg.content) return [];
+
+        return [{ role: "assistant", content: msg.content }];
+      }
+
+      try {
+        const assistantContent: (TextPart | ToolCallPart)[] = [];
+        const toolContent: ToolResultPart[] = [];
+
+        for (const block of parsed.data) {
+          if (block.type === "text") {
+            assistantContent.push({ type: "text", text: block.text });
+          } else if (block.type === "tool-use") {
+            // Skip tool-call blocks that never received a result
+            // (can happen with interrupted streams)
+            if (block.result === undefined) continue;
+
+            assistantContent.push({
+              type: "tool-call",
+              toolCallId: block.id,
+              toolName: block.name,
+              input: block.input,
+            });
+
+            // Parse the stored JSON string back to its original shape
+            let parsedResult: unknown = block.result;
+
+            try {
+              parsedResult = JSON.parse(block.result);
+            } catch {
+              // If it's not valid JSON, treat it as plain text
+            }
+
+            const wrappedOutput =
+              typeof parsedResult === "string"
+                ? ({ type: "text", value: parsedResult } as const)
+                : ({ type: "json", value: parsedResult as JSONValue } as const);
+
+            toolContent.push({
+              type: "tool-result",
+              toolCallId: block.id,
+              toolName: block.name,
+              output: wrappedOutput,
+            });
+          }
+          // "reasoning" blocks are intentionally omitted from history:
+          // they are display-only and not valid in AssistantContent for
+          // most providers (Groq, Google).
+        }
+
+        const results: ModelMessage[] = [];
+
+        if (assistantContent.length > 0) {
+          results.push({ role: "assistant", content: assistantContent });
+        } else if (msg.content) {
+          // No parseable blocks but we have a text summary — use it
+          results.push({ role: "assistant", content: msg.content });
+        }
+
+        if (toolContent.length > 0) {
+          results.push({ role: "tool", content: toolContent });
+        }
+
+        return results;
+      } catch {
+        // Last-resort fallback: if reconstruction throws for any reason,
+        // include the message as plain text so the session stays usable.
+        if (!msg.content) return [];
+        return [{ role: "assistant", content: msg.content }];
+      }
+    }
+
+    return [];
   });
 }
 
@@ -56,9 +152,23 @@ function pruneHistory(messages: HistoryMessage[], maxChars = 24000) {
 
     if (!msg) continue;
     if (msg.role === "ERROR") continue;
-    if (msg.role === "AGENT" && msg.content.length === 0) continue;
 
-    currentChars += msg.content.length;
+    let charCount = msg.content.length;
+
+    // If it's an AGENT message with blocks, we must account for the
+    // size of the tool's output, otherwise we'll blow past the context limit
+    if (msg.role === "AGENT" && msg.blocks) {
+      const parsed = messageContentSchema.safeParse(msg.blocks);
+
+      if (parsed.success) {
+        charCount = Math.max(charCount, JSON.stringify(parsed.data).length);
+      }
+    }
+
+    // Skip truly empty messages
+    if (msg.role === "AGENT" && charCount === 0) continue;
+
+    currentChars += charCount;
 
     if (currentChars > maxChars) {
       break;
@@ -86,9 +196,10 @@ function getLastUserMessageForRegeneration(
 
 interface ChatStreamContext {
   sessionId: string;
+  cwd: string | null;
   model: SupportedChatModelId;
   mode: Mode;
-  history: { role: "user" | "assistant"; content: string }[];
+  history: ModelMessage[];
   abortController: AbortController;
 }
 
@@ -96,15 +207,26 @@ async function streamAIResponse(
   stream: SSEStreamingApi,
   context: ChatStreamContext,
 ) {
-  const { sessionId, model, mode, history, abortController } = context;
-
+  const { sessionId, cwd, model, mode, history, abortController } = context;
   const startedAt = Date.now();
+  const tools = cwd ? createTools(cwd, mode) : undefined;
+  const messageBlocks: MessageBlock[] = [];
   const resolvedModel = resolveModel(model);
-  let fullText = "";
 
   const saveInterruptedMsg = async () => {
+    if (messageBlocks.length === 0) return;
+
+    const fullText = messageBlocks
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+
     if (fullText.length === 0) return;
 
+    const validatedBlocks: Prisma.InputJsonValue | undefined =
+      messageBlocks.length > 0
+        ? messageContentSchema.parse(messageBlocks)
+        : undefined;
     const elapsedMs = Date.now() - startedAt;
 
     await db.message.create({
@@ -115,6 +237,7 @@ async function streamAIResponse(
         model,
         mode,
         content: fullText, // save whatever text was generated before abort
+        blocks: validatedBlocks,
         duration: Math.round(elapsedMs / 1000),
       },
     });
@@ -122,6 +245,10 @@ async function streamAIResponse(
 
   try {
     const result = streamText({
+      providerOptions: resolvedModel.providerOptions,
+      system: buildSystemPrompt({ cwd, mode }),
+      tools,
+      stopWhen: tools ? stepCountIs(50) : undefined,
       model: resolvedModel.model,
       messages: history,
       abortSignal: abortController.signal,
@@ -130,8 +257,34 @@ async function streamAIResponse(
     for await (const block of result.fullStream) {
       if (stream.aborted) break;
 
+      if (block.type === "reasoning-delta") {
+        const lastBlock = messageBlocks[messageBlocks.length - 1];
+
+        if (lastBlock && lastBlock.type === "reasoning") {
+          lastBlock.text += block.text;
+        } else {
+          messageBlocks.push({ type: "reasoning", text: block.text });
+        }
+
+        const reasoningDeltaEvent: AgentStreamEvent = {
+          type: "reasoning-delta",
+          text: block.text,
+        };
+        await stream.writeSSE({
+          event: "reasoning-delta",
+          data: JSON.stringify(reasoningDeltaEvent),
+        });
+      }
+
       if (block.type === "text-delta") {
-        fullText += block.text;
+        const lastBlock = messageBlocks[messageBlocks.length - 1];
+
+        if (lastBlock && lastBlock.type === "text") {
+          lastBlock.text += block.text;
+        } else {
+          messageBlocks.push({ type: "text", text: block.text });
+        }
+
         const textDeltaEvent: AgentStreamEvent = {
           type: "text-delta",
           text: block.text,
@@ -139,6 +292,52 @@ async function streamAIResponse(
         await stream.writeSSE({
           event: "text-delta",
           data: JSON.stringify(textDeltaEvent),
+        });
+      }
+
+      if (block.type === "tool-call") {
+        const toolInput = toolInputSchema.parse(block.input);
+        messageBlocks.push({
+          type: "tool-use",
+          id: block.toolCallId,
+          name: block.toolName,
+          input: toolInput,
+        });
+        const toolCallEvent: AgentStreamEvent = {
+          type: "tool-input",
+          toolCallId: block.toolCallId,
+          toolName: block.toolName,
+          input: toolInput,
+        };
+        await stream.writeSSE({
+          event: "tool-input",
+          data: JSON.stringify(toolCallEvent),
+        });
+      }
+
+      if (block.type === "tool-result") {
+        const storedResult =
+          typeof block.output === "string"
+            ? block.output
+            : JSON.stringify(block.output);
+
+        const toolUseBlock = messageBlocks.find(
+          (b): b is Extract<MessageBlock, { type: "tool-use" }> =>
+            b.type === "tool-use" && b.id === block.toolCallId,
+        );
+
+        if (toolUseBlock) {
+          toolUseBlock.result = storedResult;
+        }
+
+        const toolOutputEvent: AgentStreamEvent = {
+          type: "tool-output",
+          toolCallId: block.toolCallId,
+          result: storedResult,
+        };
+        await stream.writeSSE({
+          event: "tool-output",
+          data: JSON.stringify(toolOutputEvent),
         });
       }
 
@@ -153,6 +352,14 @@ async function streamAIResponse(
       return;
     }
 
+    const fullText = messageBlocks
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+    const validatedBlocks: Prisma.InputJsonValue | undefined =
+      messageBlocks.length > 0
+        ? messageContentSchema.parse(messageBlocks)
+        : undefined;
     const elapsedMs = Date.now() - startedAt;
     const agentMessage = await db.message.create({
       data: {
@@ -162,6 +369,7 @@ async function streamAIResponse(
         model,
         mode,
         content: fullText,
+        blocks: validatedBlocks,
         duration: Math.round(elapsedMs / 1000),
       },
     });
@@ -181,7 +389,12 @@ async function streamAIResponse(
       return;
     }
 
-    const errMsg = error instanceof Error ? error.message : String(error);
+    const errMsg =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null
+          ? JSON.stringify(error)
+          : String(error);
     await db.message.create({
       data: {
         sessionId,
@@ -233,6 +446,7 @@ const chatRouter = new Hono()
       // Append the new user message:
       {
         role: "USER" as const,
+        blocks: null,
         content: data.content,
         status: MessageStatus.COMPLETED,
       },
@@ -249,6 +463,7 @@ const chatRouter = new Hono()
 
         await streamAIResponse(stream, {
           sessionId,
+          cwd: session.cwd,
           model: data.model,
           history,
           mode: data.mode,
@@ -281,6 +496,18 @@ const chatRouter = new Hono()
       return c.json({ error: "Session not found" }, 404);
     }
 
+    // Check if the last message is the AI's response (or a failed response)
+    // If it is, we delete it to make room for the new regeneration
+    const lastMsg = session.messages[session.messages.length - 1];
+
+    if (lastMsg && (lastMsg.role === "AGENT" || lastMsg.role === "ERROR")) {
+      await db.message.delete({ where: { id: lastMsg.id } });
+
+      // Remove it from the in-memory array so the rest of the code
+      // (like buildChatHistory) doesn't use it
+      session.messages.pop();
+    }
+
     const regeneratableMessage = getLastUserMessageForRegeneration(
       session.messages,
     );
@@ -310,7 +537,8 @@ const chatRouter = new Hono()
 
     activeRegenerations.add(sessionId);
 
-    const history = buildChatHistory(session.messages);
+    const recentMessages = pruneHistory(session.messages);
+    const history = buildChatHistory(recentMessages);
     const abortController = new AbortController();
 
     try {
@@ -324,6 +552,7 @@ const chatRouter = new Hono()
           try {
             await streamAIResponse(stream, {
               sessionId,
+              cwd: session.cwd,
               model: regeneratableMessage.model as SupportedChatModelId,
               mode: regeneratableMessage.mode,
               history,

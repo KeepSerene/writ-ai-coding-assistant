@@ -57,7 +57,7 @@ function Dialog({ config, close }: DialogProps) {
           justifyContent="space-between"
           alignItems="center"
         >
-          <text attributes={TextAttributes.BOLD} fg={colors.text}>
+          <text attributes={TextAttributes.BOLD} fg={colors.onDialog}>
             {title}
           </text>
 

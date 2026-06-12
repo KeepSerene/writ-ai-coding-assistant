@@ -5,6 +5,8 @@ import { Role, Mode, MessageStatus } from "@writ/db/enums";
 import { db } from "@writ/db/client";
 import * as Sentry from "@sentry/hono/node";
 import { SUPPORTED_CHAT_MODEL_IDS } from "@writ/shared";
+import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
 
 const newSessionSchema = z.object({
   title: z.string(),
@@ -33,6 +35,16 @@ const newSessionValidator = zValidator(
     }
   },
 );
+
+const titleSchema = z.object({
+  prompt: z.string().min(1),
+});
+
+const titleValidator = zValidator("json", titleSchema, (result, c) => {
+  if (!result.success) {
+    return c.json({ error: "prompt is required" }, 400);
+  }
+});
 
 const sessionsRouter = new Hono()
   .get("/", async (c) => {
@@ -100,6 +112,42 @@ const sessionsRouter = new Hono()
     });
 
     return c.json(session, 201);
+  })
+  .post("/:id/title", titleValidator, async (c) => {
+    const id = c.req.param("id");
+    const { prompt } = c.req.valid("json");
+
+    const buildFallbackTitle = () => {
+      const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
+      const safe = Array.from(segmenter.segment(prompt))
+        .slice(0, 40)
+        .map((s) => s.segment)
+        .join("");
+      return safe.length < prompt.length ? `${safe}...` : safe;
+    };
+
+    let title: string;
+
+    try {
+      const { text } = await generateText({
+        model: google("gemini-3.1-flash-lite"),
+        prompt: `Generate a concise title (3-6 words) for a coding assistant session based on this user request:\n\n"${prompt}"\n\nRules: Return only the title. No quotes. No trailing punctuation. Capitalize like a title.`,
+        maxOutputTokens: 25,
+      });
+
+      title = text.trim().slice(0, 60);
+      Sentry.logger.info("Session title generated", { sessionId: id });
+    } catch (error) {
+      title = buildFallbackTitle();
+      Sentry.logger.warn("Title generation failed, using fallback", {
+        sessionId: id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    await db.session.update({ where: { id }, data: { title } });
+
+    return c.json({ title });
   });
 
 export default sessionsRouter;

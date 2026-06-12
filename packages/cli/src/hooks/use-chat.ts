@@ -10,7 +10,19 @@ import { EventSourceParserStream } from "eventsource-parser/stream";
 import prettyMilliseconds from "pretty-ms";
 import apiClient from "../lib/api-client";
 
-export type MessageBlock = { type: "text"; text: string };
+export interface UIMessageToolUseBlock {
+  type: "tool-use";
+  status: "calling" | "done";
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  result?: string;
+}
+
+export type UIMessageBlock =
+  | { type: "reasoning"; text: string }
+  | UIMessageToolUseBlock
+  | { type: "text"; text: string };
 
 export type Message =
   | {
@@ -26,7 +38,7 @@ export type Message =
       model: SupportedChatModelId;
       mode: Mode;
       content: string;
-      blocks: MessageBlock[];
+      blocks: UIMessageBlock[];
       duration?: string;
       isInterrupted?: boolean;
     }
@@ -38,14 +50,14 @@ type StreamUIState =
       status: "streaming";
       model: SupportedChatModelId;
       mode: Mode;
-      blocks: MessageBlock[];
+      blocks: UIMessageBlock[];
     };
 
 interface ActiveStreamSession {
   requestId: string;
   model: SupportedChatModelId;
   mode: Mode;
-  blocks: MessageBlock[];
+  blocks: UIMessageBlock[];
   controller: AbortController;
   interruptionCaptured: boolean;
 }
@@ -71,12 +83,22 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
   const activeStreamRef = useRef<ActiveStreamSession | null>(null);
   const hasAutoRegeneratedRef = useRef(false);
 
+  // Abort on unmount
+  useEffect(() => {
+    return () => {
+      if (activeStreamRef.current) {
+        activeStreamRef.current.controller.abort();
+        activeStreamRef.current = null;
+      }
+    };
+  }, []);
+
   const isRequestActive = useCallback((reqId: string) => {
     return activeStreamRef.current?.requestId === reqId;
   }, []);
 
   const syncStreamUI = useCallback(
-    (reqId: string, blocks: MessageBlock[]) => {
+    (reqId: string, blocks: UIMessageBlock[]) => {
       if (!isRequestActive(reqId) || !activeStreamRef.current) return;
 
       activeStreamRef.current.blocks = blocks;
@@ -116,7 +138,7 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
         return;
       }
 
-      let currentBlocks: MessageBlock[] = [];
+      let currentBlocks: UIMessageBlock[] = [];
 
       if (!response.body) {
         setMessages((prev) => [
@@ -157,6 +179,61 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
         }
 
         switch (agentStreamEvent.type) {
+          case "reasoning-delta": {
+            const updatedBlocks = [...currentBlocks];
+            const lastIndex = updatedBlocks.length - 1;
+            const lastBlock = updatedBlocks[lastIndex];
+
+            if (lastBlock?.type === "reasoning") {
+              updatedBlocks[lastIndex] = {
+                ...lastBlock,
+                text: lastBlock.text + agentStreamEvent.text,
+              };
+            } else {
+              updatedBlocks.push({
+                type: "reasoning",
+                text: agentStreamEvent.text,
+              });
+            }
+
+            currentBlocks = updatedBlocks;
+            syncStreamUI(activeStream.requestId, currentBlocks);
+            break;
+          }
+          case "tool-input": {
+            const updatedBlocks = [...currentBlocks];
+            updatedBlocks.push({
+              type: "tool-use",
+              status: "calling",
+              id: agentStreamEvent.toolCallId,
+              name: agentStreamEvent.toolName,
+              input: agentStreamEvent.input,
+            });
+
+            currentBlocks = updatedBlocks;
+            syncStreamUI(activeStream.requestId, currentBlocks);
+            break;
+          }
+          case "tool-output": {
+            const updatedBlocks = [...currentBlocks];
+            const index = updatedBlocks.findIndex(
+              (b): b is UIMessageToolUseBlock =>
+                b.type === "tool-use" && b.id === agentStreamEvent.toolCallId,
+            );
+
+            if (index !== -1) {
+              const original = updatedBlocks[index] as UIMessageToolUseBlock;
+              updatedBlocks[index] = {
+                ...original,
+                result: agentStreamEvent.result,
+                status: "done",
+              };
+            }
+
+            currentBlocks = updatedBlocks;
+            syncStreamUI(activeStream.requestId, currentBlocks);
+            break;
+          }
           case "text-delta": {
             const updatedBlocks = [...currentBlocks];
             const lastIndex = updatedBlocks.length - 1;
@@ -195,6 +272,10 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
                 duration: prettyMilliseconds(agentStreamEvent.durationMs),
               },
             ]);
+
+            // Clear immediately so the spinner drops the moment the message lands,
+            // rather than waiting for the TCP connection to fully close
+            clearActiveStream(activeStream.requestId);
             break;
           }
           case "error": {
@@ -211,7 +292,7 @@ export function useChat(sessionId: string, initialMessages: Message[]) {
         }
       }
     },
-    [isRequestActive, syncStreamUI],
+    [isRequestActive, syncStreamUI, clearActiveStream],
   );
 
   const startStreamRequest = useCallback(
