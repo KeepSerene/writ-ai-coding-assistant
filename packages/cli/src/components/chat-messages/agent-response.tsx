@@ -42,7 +42,6 @@ function getConsecutiveBlocksGroup(
 interface AgentResponseProps {
   model: SupportedChatModelId;
   mode: Mode;
-  // isStreaming?: boolean;
   blocks: UIMessageBlock[];
   duration?: string;
   isInterrupted?: boolean;
@@ -51,7 +50,6 @@ interface AgentResponseProps {
 function AgentResponse({
   model,
   mode,
-  // isStreaming = false,
   blocks,
   duration,
   isInterrupted = false,

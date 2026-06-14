@@ -1,5 +1,11 @@
 import type { CommandMenuItem } from "../components/command-menu/types";
-import { COMMAND_MENU_ITEMS } from "./constants";
+import {
+  COMMAND_MENU_ITEMS,
+  CWD,
+  MAX_MENTION_FALLBACK_CANDIDATES,
+  MENTION_SKIP_DIRS,
+  VALID_MENTION_QUERY_CHAR_REGEX,
+} from "./constants";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import {
   CONFIG_DIR,
@@ -11,12 +17,21 @@ import {
 } from "./themes";
 import type { UIMessageToolUseBlock } from "../hooks/use-chat";
 import { SUPPORTED_CHAT_MODELS, type SupportedChatModelId } from "@writ/shared";
+import { isAbsolute, relative, resolve } from "node:path";
+import { readdir } from "node:fs/promises";
 
-export function getFilteredCmdItems(query: string): CommandMenuItem[] {
-  if (query.length === 0) return COMMAND_MENU_ITEMS;
+export function getFilteredCmdItems(
+  items: CommandMenuItem[],
+  query: string,
+): CommandMenuItem[] {
+  if (!query) return items;
 
-  return COMMAND_MENU_ITEMS.filter((item) =>
-    item.name.toLowerCase().startsWith(query.toLowerCase()),
+  const lowered = query.toLowerCase();
+
+  return items.filter(
+    (item) =>
+      item.name.toLowerCase().startsWith(lowered) ||
+      item.command.toLowerCase().includes(lowered),
   );
 }
 
@@ -131,4 +146,203 @@ export function formatToolArguments(
 
 export function getModelLabel(modelId: SupportedChatModelId): string {
   return SUPPORTED_CHAT_MODELS.find((m) => m.id === modelId)?.label ?? modelId;
+}
+
+export function isWithinCWD(targetPath: string): boolean {
+  const abs = isAbsolute(targetPath) ? targetPath : resolve(CWD, targetPath);
+  const rel = relative(CWD, abs); // "src/comp" or "../../etc" etc.
+
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+export function isValidMentionQueryChar(char: string) {
+  return VALID_MENTION_QUERY_CHAR_REGEX.test(char);
+}
+
+export interface ActiveMentionContext {
+  query: string; // The text typed after the '@' (e.g., "src/comp")
+  startIndex: number; // Absolute position in the full text where the '@' starts
+  endIndex: number; // Absolute position in the full text where the word ends
+}
+
+export function findActiveMention(
+  text: string,
+  cursorOffset: number,
+): ActiveMentionContext | null {
+  const safeOffset = Math.max(0, Math.min(cursorOffset, text.length));
+
+  // Expand outwards to isolate the exact word the cursor is currently touching
+  let start = safeOffset,
+    end = safeOffset;
+
+  while (start > 0 && !/\s/.test(text[start - 1]!)) {
+    start -= 1;
+  }
+
+  while (end < text.length && !/\s/.test(text[end]!)) {
+    end += 1;
+  }
+
+  const token = text.slice(start, end);
+  const relativeCursor = safeOffset - start;
+
+  // Find the closest '@' symbol looking backwards from the cursor
+  const mentionStart = token.lastIndexOf("@", relativeCursor);
+
+  if (mentionStart === -1) return null; // No '@' found before the cursor
+
+  // Prevent false positives (e.g., email addresses like "user@domain.com")
+  // An '@' must be at the very start of the word, or preceded by a non-query char
+  const prevChar = token[mentionStart - 1];
+
+  if (prevChar && isValidMentionQueryChar(prevChar)) return null;
+
+  // Ensure the cursor is actually positioned after the '@' symbol
+  // If relativeCursor < mentionStart, they are typing before the '@'
+  if (relativeCursor <= mentionStart) return null;
+
+  // Return the query string (everything after the '@' up to the end of the word)
+  // and the absolute positions so the UI knows exactly what text to replace later
+  return {
+    query: token.slice(mentionStart + 1), // Extract the string after the '@'
+    startIndex: start + mentionStart, // Absolute index of the '@'
+    endIndex: end, // Absolute index of the end of the word
+  };
+}
+
+export interface MentionCandidate {
+  type: "file" | "directory";
+  path: string;
+}
+
+export async function getMentionCandidates(
+  query: string,
+): Promise<MentionCandidate[]> {
+  // Normalize: strip leading "./" so "./src" and "src" are treated identically
+  const normalized = query.startsWith("./") ? query.slice(2) : query;
+
+  // Reject absolute paths — only project-relative references are allowed
+  if (normalized.startsWith("/")) return [];
+
+  // Split the query into the folder to scan (dirPart) and the partial
+  // filename to filter by (namePrefix). A trailing slash means "list
+  // everything inside this folder" with no prefix filter.
+  const hasTrailingSlash = normalized.endsWith("/");
+  const lastSlashIndex = hasTrailingSlash
+    ? normalized.length - 1
+    : normalized.lastIndexOf("/");
+
+  const dirPart = hasTrailingSlash
+    ? normalized.slice(0, -1)
+    : lastSlashIndex === -1
+      ? ""
+      : normalized.slice(0, lastSlashIndex);
+
+  const namePrefix = hasTrailingSlash
+    ? ""
+    : lastSlashIndex === -1
+      ? normalized
+      : normalized.slice(lastSlashIndex + 1);
+
+  const absoluteDir = resolve(CWD, dirPart || ".");
+
+  // Security: block path traversal (e.g. "@../../etc/passwd")
+  if (!isWithinCWD(absoluteDir)) return [];
+
+  const lowerCased = namePrefix.toLowerCase();
+  // Only surface hidden entries (dotfiles) when the user explicitly types a "."
+  const shouldShowHiddenEntries = namePrefix.startsWith(".");
+
+  try {
+    // Phase 1: direct scan of the target directory
+    const entries = await readdir(absoluteDir, { withFileTypes: true });
+
+    const directMatches = entries
+      .filter(
+        (entry) =>
+          !(entry.isDirectory() && MENTION_SKIP_DIRS.has(entry.name)) &&
+          (shouldShowHiddenEntries || !entry.name.startsWith(".")) &&
+          (lowerCased === "" ||
+            entry.name.toLowerCase().startsWith(lowerCased)),
+      )
+      // Directories first, then alphabetical within each group
+      .sort((left, right) => {
+        if (left.isDirectory() !== right.isDirectory()) {
+          return left.isDirectory() ? -1 : 1;
+        }
+
+        return left.name.localeCompare(right.name);
+      })
+      .map((entry) => {
+        const type: MentionCandidate["type"] = entry.isDirectory()
+          ? "directory"
+          : "file";
+        const entryPath = dirPart ? `${dirPart}/${entry.name}` : entry.name;
+
+        // Append trailing slash to directories so tab-completing into them works
+        return {
+          type,
+          path: type === "directory" ? `${entryPath}/` : entryPath,
+        };
+      });
+
+    // Return early if: we found something, the user already drilled into a
+    // subdir (further recursion won't help), or the query was empty
+    if (directMatches.length > 0 || dirPart !== "" || namePrefix === "") {
+      return directMatches;
+    }
+
+    // Phase 2: recursive fallback walk from CWD
+    // Only reached when the user typed a bare name (e.g. "@index") and
+    // nothing matched directly in CWD.
+    const fallbackMatches: MentionCandidate[] = [];
+
+    const visit = async (absDir: string, relDir: string): Promise<void> => {
+      if (fallbackMatches.length >= MAX_MENTION_FALLBACK_CANDIDATES) return;
+
+      const entries = await readdir(absDir, { withFileTypes: true });
+      const subdirs: Array<{ abs: string; rel: string }> = [];
+
+      for (const entry of entries) {
+        if (fallbackMatches.length >= MAX_MENTION_FALLBACK_CANDIDATES) break;
+        if (!shouldShowHiddenEntries && entry.name.startsWith(".")) continue;
+        // Skip known large/irrelevant directories to keep the walk fast
+        if (entry.isDirectory() && MENTION_SKIP_DIRS.has(entry.name)) continue;
+
+        const type: MentionCandidate["type"] = entry.isDirectory()
+          ? "directory"
+          : "file";
+        const entryRel = relDir ? `${relDir}/${entry.name}` : entry.name;
+
+        if (entry.name.toLowerCase().startsWith(lowerCased)) {
+          fallbackMatches.push({
+            type,
+            path: type === "directory" ? `${entryRel}/` : entryRel,
+          });
+        }
+
+        // Collect subdirectories; don't recurse yet so we can go parallel below
+        if (entry.isDirectory()) {
+          subdirs.push({ abs: resolve(absDir, entry.name), rel: entryRel });
+        }
+      }
+
+      // Recurse into all subdirectories in parallel instead of sequentially.
+      // Guard with the cap before spawning any promises to avoid wasteful I/O.
+      if (fallbackMatches.length < MAX_MENTION_FALLBACK_CANDIDATES) {
+        await Promise.all(subdirs.map(({ abs, rel }) => visit(abs, rel)));
+      }
+    };
+
+    await visit(CWD, "");
+
+    // Sort by full relative path for a stable, predictable ordering
+    return fallbackMatches.sort((left, right) =>
+      left.path.localeCompare(right.path),
+    );
+  } catch (error) {
+    console.error("Failed to fetch mention candidates:", error);
+
+    return [];
+  }
 }

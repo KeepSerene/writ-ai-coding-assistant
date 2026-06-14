@@ -7,6 +7,8 @@ import {
   SessionsDialog,
   ThemesDialog,
 } from "../components/dialogs";
+import { initiateOAuthLogin } from "./oauth";
+import { clearAuthToken } from "./auth-token-store";
 
 export const EMPTY_BORDER_CONFIG = {
   topLeft: "",
@@ -101,16 +103,33 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
   {
     name: "login",
     description: "Sign in with your browser",
+    showWhen: "unauthenticated",
     command: "/login",
-    action: (ctx) => {
+    action: async (ctx) => {
       ctx.toast.show({ message: "Opening browser to sign in..." });
+
+      try {
+        await initiateOAuthLogin();
+        ctx.toast.show({
+          variant: "success",
+          message: "Signed in successfully",
+        });
+      } catch (error) {
+        const errMsg =
+          error instanceof Error
+            ? error.message
+            : "Sign in failed or timed out";
+        ctx.toast.show({ variant: "error", message: errMsg });
+      }
     },
   },
   {
     name: "logout",
     description: "Sign out of your account",
+    showWhen: "authenticated",
     command: "/logout",
     action: (ctx) => {
+      clearAuthToken();
       ctx.toast.show({
         variant: "success",
         message: "Signed out successfully!",
@@ -149,3 +168,38 @@ export const COMMAND_COL_WIDTH =
 export const DEFAULT_TOAST_DURATION = 3000 as const;
 
 export const MAX_VISIBLE_FILTER_LIST_ITEMS = 6 as const;
+
+export const MAX_VISIBLE_MENTIONS = 8 as const;
+export const CWD = process.cwd();
+export const MAX_MENTION_FALLBACK_CANDIDATES = 32 as const;
+export const VALID_MENTION_QUERY_CHAR_REGEX = /[A-Za-z0-9._/-]/;
+export const MENTION_SKIP_DIRS = new Set([
+  // Version control
+  ".git",
+  ".svn",
+  ".hg",
+  // JS/TS dependency & build dirs
+  "node_modules",
+  "dist",
+  "build",
+  "out",
+  ".next", // Next.js
+  ".nuxt", // Nuxt
+  ".svelte-kit", // SvelteKit
+  ".turbo", // Turborepo
+  ".cache", // Various build tools (Parcel, Babel, etc.)
+  "coverage", // Jest/Vitest coverage output
+  ".expo", // Expo (React Native)
+  // Python (common in full-stack repos)
+  "__pycache__",
+  ".venv",
+  "venv",
+  ".mypy_cache",
+  ".pytest_cache",
+  // Rust / systems
+  "target",
+  // macOS / editor noise
+  ".DS_Store",
+  ".idea",
+  ".vscode",
+]);

@@ -15,7 +15,12 @@ type InterruptHandler = () => boolean;
 // UI layers
 // "prompt-area" is the base layer
 // any input or textarea on a dialog or a surface represents a text-field layer
-type LayerId = "base" | "command-menu" | "dialog" | "text-field";
+type LayerId =
+  | "base"
+  | "command-menu"
+  | "dialog"
+  | "text-field"
+  | "mention-menu";
 
 interface InputStackContextValue {
   pushLayer: (id: LayerId, handler?: InterruptHandler) => void;
