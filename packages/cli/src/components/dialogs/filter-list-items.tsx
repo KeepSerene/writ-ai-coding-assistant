@@ -159,6 +159,7 @@ function FilterListItemsDialog<T>({
         ref={inputRef}
         focused
         textColor={colors.onDialog}
+        cursorColor={colors.primary}
         onContentChange={handleContentChange}
         placeholder={placeholder}
       />

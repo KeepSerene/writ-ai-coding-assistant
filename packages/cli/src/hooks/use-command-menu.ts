@@ -4,10 +4,12 @@ import type { CommandMenuItem } from "../components/command-menu/types";
 import { getFilteredCmdItems } from "../lib/utils";
 import { useKeyboard } from "@opentui/react";
 import { useInputStack } from "../providers/input-stack";
+import { COMMAND_MENU_ITEMS } from "../lib/constants";
+import { getAuthToken } from "../lib/auth-token-store";
 
 interface CommandMenuControls {
+  filteredCmdItems: CommandMenuItem[];
   showCmdMenu: boolean;
-  cmdQuery: string;
   selectedCmdIndex: number;
   setSelectedCmdIndex: (index: number) => void;
   handleInputChange: (inputStr: string) => void;
@@ -28,10 +30,19 @@ export default function useCommandMenu(): CommandMenuControls {
   const cmdQuery =
     showCmdMenu && userInput.startsWith("/") ? userInput.slice(1) : "";
 
-  const filteredCmdItems = useMemo(
-    () => getFilteredCmdItems(cmdQuery),
-    [cmdQuery],
-  );
+  const isAuthenticated = Boolean(getAuthToken());
+  const filteredCmdItems = useMemo(() => {
+    // First pass: filter by auth visibility
+    const authVisibleItems = COMMAND_MENU_ITEMS.filter((item) => {
+      if (item.showWhen === "authenticated") return isAuthenticated;
+      if (item.showWhen === "unauthenticated") return !isAuthenticated;
+
+      return true; // "always" or undefined
+    });
+
+    // Second pass: filter by the user's typed query
+    return getFilteredCmdItems(authVisibleItems, cmdQuery);
+  }, [cmdQuery, isAuthenticated]);
 
   const closeMenu = () => {
     setShowCmdMenu(false);
@@ -124,8 +135,8 @@ export default function useCommandMenu(): CommandMenuControls {
   });
 
   return {
+    filteredCmdItems,
     showCmdMenu,
-    cmdQuery,
     selectedCmdIndex,
     setSelectedCmdIndex,
     handleInputChange,

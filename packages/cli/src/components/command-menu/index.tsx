@@ -4,11 +4,11 @@ import {
   COMMAND_COL_WIDTH,
   MAX_VISIBLE_COMMAND_ITEMS,
 } from "../../lib/constants";
-import { getFilteredCmdItems } from "../../lib/utils";
 import { useTheme } from "../../providers/theme";
+import type { CommandMenuItem } from "./types";
 
 interface CommandMenuProps {
-  query: string;
+  filteredCmdItems: CommandMenuItem[];
   selectedCmdIndex: number;
   onSelectCmd: (index: number) => void;
   onExecuteCmd: (index: number) => void;
@@ -16,13 +16,12 @@ interface CommandMenuProps {
 }
 
 export default function CommandMenu({
-  query,
+  filteredCmdItems,
   selectedCmdIndex,
   onSelectCmd,
   onExecuteCmd,
   scrollBoxRef,
 }: CommandMenuProps) {
-  const filteredCmdItems = getFilteredCmdItems(query);
   const visibleHeight = Math.min(
     filteredCmdItems.length,
     MAX_VISIBLE_COMMAND_ITEMS,

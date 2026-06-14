@@ -17,6 +17,7 @@ export interface CommandContext {
 export interface CommandMenuItem {
   name: string;
   description: string;
+  showWhen?: "always" | "authenticated" | "unauthenticated";
   command: string;
   action?: (ctx: CommandContext) => void | Promise<void>;
 }

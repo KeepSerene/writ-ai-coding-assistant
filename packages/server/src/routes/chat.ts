@@ -25,6 +25,7 @@ import { Hono } from "hono";
 import type { Prisma } from "@writ/db";
 import createTools from "../tools";
 import buildSystemPrompt from "../lib/system-prompt";
+import type { AuthenticatedEnv } from "../middlewares/require-auth";
 
 const chatReqSchema = z.object({
   content: z.string(),
@@ -411,7 +412,7 @@ async function streamAIResponse(
   }
 }
 
-const chatRouter = new Hono()
+const chatRouter = new Hono<AuthenticatedEnv>()
   .post("/", chatReqValidator, async (c) => {
     const sessionId = c.req.param("sessionId");
 
@@ -419,8 +420,10 @@ const chatRouter = new Hono()
       return c.json({ error: "Missing session ID" }, 400);
     }
 
+    const userId = c.get("userId");
+
     const session = await db.session.findUnique({
-      where: { id: sessionId },
+      where: { userId, id: sessionId },
       include: { messages: { orderBy: { createdAt: "asc" } } },
     });
 
@@ -487,8 +490,10 @@ const chatRouter = new Hono()
       return c.json({ error: "Missing session ID" }, 400);
     }
 
+    const userId = c.get("userId");
+
     const session = await db.session.findUnique({
-      where: { id: sessionId },
+      where: { userId, id: sessionId },
       include: { messages: { orderBy: { createdAt: "asc" } } },
     });
 

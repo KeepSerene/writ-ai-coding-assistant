@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SPLIT_BORDER_CONFIG, TEXTAREA_KEY_BINDINGS } from "../lib/constants";
 import CommandMenu from "./command-menu";
 import SessionContext from "./session-context";
-import type { TextareaRenderable } from "@opentui/core";
+import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import { useKeyboard, useRenderer } from "@opentui/react";
 import useCommandMenu from "../hooks/use-command-menu";
 import type { CommandMenuItem } from "./command-menu/types";
@@ -13,6 +13,13 @@ import { useTheme } from "../providers/theme";
 import { useNavigate } from "react-router";
 import { useSessionCtx } from "../providers/session-context";
 import { Mode } from "@writ/db/enums";
+import {
+  findActiveMention,
+  getMentionCandidates,
+  type ActiveMentionContext,
+  type MentionCandidate,
+} from "../lib/utils";
+import MentionMenu from "./MentionMenu";
 
 interface PromptAreaProps {
   onSubmit: (prompt: string) => void;
@@ -20,20 +27,30 @@ interface PromptAreaProps {
 }
 
 function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
-  const toast = useToast();
-  const dialog = useDialog();
+  const [activeMention, setActiveMention] =
+    useState<ActiveMentionContext | null>(null);
+  const [mentionCandidates, setMentionCandidates] = useState<
+    MentionCandidate[]
+  >([]);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+
   const textareaRef = useRef<TextareaRenderable>(null);
   const onSubmitRef = useRef<() => void>(() => {});
+  const activeMentionRef = useRef<ActiveMentionContext | null>(null);
+  const mentionMenuScrollBoxRef = useRef<ScrollBoxRenderable>(null);
+
+  const toast = useToast();
+  const dialog = useDialog();
   const renderer = useRenderer();
-  const { setInterruptHandler, isTopLayer } = useInputStack();
+  const { setInterruptHandler, isTopLayer, pushLayer, popLayer } =
+    useInputStack();
   const {
     currentTheme: { colors },
   } = useTheme();
   const navigate = useNavigate();
   const { mode, setMode, toggleMode, model, setModel } = useSessionCtx();
-
   const {
-    cmdQuery,
+    filteredCmdItems,
     showCmdMenu,
     selectedCmdIndex,
     setSelectedCmdIndex,
@@ -41,6 +58,8 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
     resolveCmdItem,
     scrollBoxRef,
   } = useCommandMenu();
+
+  const showMentionMenu = activeMention !== null;
 
   const handleCmdItem = useCallback(
     (cmdItem: CommandMenuItem | undefined) => {
@@ -91,6 +110,85 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
     textarea.setText("");
   }, [disabled, onSubmit]);
 
+  const closeMentionMenu = useCallback(() => {
+    activeMentionRef.current = null;
+    setActiveMention(null);
+    setMentionCandidates([]);
+    popLayer("mention-menu");
+  }, [setActiveMention, setMentionCandidates, popLayer]);
+
+  const syncMentionMenuUI = useCallback(
+    (text: string, cursorOffset: number) => {
+      const prevMention = activeMentionRef.current;
+      const nextMention = findActiveMention(text, cursorOffset);
+
+      if (!nextMention) {
+        if (prevMention) {
+          closeMentionMenu();
+        }
+
+        return;
+      }
+
+      activeMentionRef.current = nextMention;
+      setActiveMention(nextMention);
+      pushLayer("mention-menu", () => {
+        closeMentionMenu();
+
+        return true;
+      });
+
+      const hasMentionChanged =
+        prevMention?.startIndex !== nextMention.startIndex ||
+        prevMention?.endIndex !== nextMention.endIndex ||
+        prevMention?.query !== nextMention.query;
+
+      if (hasMentionChanged) {
+        setSelectedMentionIndex(0);
+        mentionMenuScrollBoxRef.current?.scrollTo(0);
+      }
+    },
+    [closeMentionMenu, setActiveMention, pushLayer, setSelectedMentionIndex],
+  );
+
+  const handleMentionExecute = useCallback(
+    (index: number) => {
+      const textarea = textareaRef.current;
+      const mention = activeMentionRef.current;
+      const candidate = mentionCandidates[index];
+
+      if (!textarea || !mention || !candidate) return;
+
+      const query =
+        candidate.type === "directory" ? candidate.path : `${candidate.path} `;
+      const updatedText = `${textarea.plainText.slice(0, mention.startIndex)}@${query}${textarea.plainText.slice(mention.endIndex)}`;
+
+      textarea.replaceText(updatedText);
+      const updatedCursorOffset = mention.startIndex + query.length + 1;
+      textarea.cursorOffset = updatedCursorOffset;
+      syncMentionMenuUI(updatedText, updatedCursorOffset);
+    },
+    [mentionCandidates, syncMentionMenuUI],
+  );
+
+  const handleCursorPosChange = useCallback(() => {
+    const textarea = textareaRef.current;
+
+    if (!textarea) return;
+
+    syncMentionMenuUI(textarea.plainText, textarea.cursorOffset);
+  }, [syncMentionMenuUI]);
+
+  const handleContentChange = useCallback(() => {
+    const textarea = textareaRef.current;
+
+    if (!textarea) return;
+
+    const text = textarea.plainText;
+    handleInputChange(text);
+    syncMentionMenuUI(text, textarea.cursorOffset);
+  }, [handleInputChange, syncMentionMenuUI]);
+
   onSubmitRef.current = () => {
     if (disabled) return;
 
@@ -101,8 +199,46 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
       return;
     }
 
+    if (showMentionMenu) {
+      const candidate = mentionCandidates[selectedMentionIndex];
+
+      if (candidate) {
+        handleMentionExecute(selectedMentionIndex);
+
+        return;
+      }
+    }
+
     handleSubmit();
   };
+
+  useEffect(() => {
+    if (!activeMention) {
+      setMentionCandidates([]);
+
+      return;
+    }
+
+    let shouldIgnore = false;
+
+    const loadCandidates = async () => {
+      if (shouldIgnore) return;
+
+      const candidates = await getMentionCandidates(activeMention.query);
+      setMentionCandidates(candidates);
+      setSelectedMentionIndex((prev) => {
+        if (candidates.length === 0) return 0;
+
+        return Math.min(prev, candidates.length - 1);
+      });
+    };
+
+    loadCandidates();
+
+    return () => {
+      shouldIgnore = true;
+    };
+  }, [activeMention, setMentionCandidates, setSelectedMentionIndex]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -128,18 +264,51 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
     return () => setInterruptHandler("base", null);
   }, [disabled, setInterruptHandler]);
 
-  const handleContentChange = useCallback(() => {
-    const textarea = textareaRef.current;
-
-    if (!textarea) return;
-
-    handleInputChange(textarea.plainText);
-  }, [handleInputChange]);
-
   useKeyboard((key) => {
-    if (disabled || !isTopLayer("base")) return;
+    if (disabled) return;
 
-    if (key.name === "tab") {
+    // Mention menu layer takes priority
+    if (showMentionMenu && isTopLayer("mention-menu")) {
+      if (key.name === "escape") {
+        key.preventDefault();
+        closeMentionMenu();
+      } else if (key.name === "up") {
+        key.preventDefault();
+        setSelectedMentionIndex((prev) => {
+          const newIndex = Math.max(0, prev - 1);
+          const scrollBox = mentionMenuScrollBoxRef.current;
+
+          if (scrollBox && newIndex < scrollBox.scrollTop) {
+            scrollBox.scrollTo(newIndex);
+          }
+
+          return newIndex;
+        });
+      } else if (key.name === "down") {
+        key.preventDefault();
+        setSelectedMentionIndex((prev) => {
+          if (mentionCandidates.length === 0) return 0;
+
+          const newIndex = Math.min(mentionCandidates.length - 1, prev + 1);
+          const scrollBox = mentionMenuScrollBoxRef.current;
+
+          if (scrollBox) {
+            const viewportHeight = scrollBox.viewport.height;
+            const visibleEnd = scrollBox.scrollTop + viewportHeight - 1;
+
+            if (newIndex > visibleEnd) {
+              scrollBox.scrollTo(newIndex - viewportHeight + 1);
+            }
+          }
+
+          return newIndex;
+        });
+      }
+      return;
+    }
+
+    // Base layer: tab toggles mode
+    if (isTopLayer("base") && key.name === "tab") {
       key.preventDefault();
       toggleMode();
     }
@@ -175,7 +344,7 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
               zIndex={10}
             >
               <CommandMenu
-                query={cmdQuery}
+                filteredCmdItems={filteredCmdItems}
                 selectedCmdIndex={selectedCmdIndex}
                 scrollBoxRef={scrollBoxRef}
                 onSelectCmd={setSelectedCmdIndex}
@@ -184,13 +353,37 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
             </box>
           )}
 
+          {!showCmdMenu && showMentionMenu && (
+            <box
+              width="100%"
+              backgroundColor={colors.surface}
+              position="absolute"
+              bottom="100%"
+              left={0}
+              zIndex={10}
+            >
+              <MentionMenu
+                candidates={mentionCandidates}
+                selectedIndex={selectedMentionIndex}
+                onSelect={setSelectedMentionIndex}
+                onExecute={handleMentionExecute}
+                scrollBoxRef={mentionMenuScrollBoxRef}
+              />
+            </box>
+          )}
+
           <textarea
             ref={textareaRef}
             focused={
-              !disabled && (isTopLayer("base") || isTopLayer("command-menu"))
+              !disabled &&
+              (isTopLayer("base") ||
+                isTopLayer("command-menu") ||
+                isTopLayer("mention-menu"))
             }
             keyBindings={TEXTAREA_KEY_BINDINGS}
             onContentChange={handleContentChange}
+            onCursorChange={handleCursorPosChange}
+            cursorColor={colors.primary}
             textColor={colors.onSurface}
             placeholder='Ask anything... "Fix a bug in the database"'
           />

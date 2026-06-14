@@ -5,6 +5,8 @@ import { sentry } from "@sentry/hono/node";
 import * as Sentry from "@sentry/hono/node";
 import sessionsRouter from "./routes/sessions";
 import chatRouter from "./routes/chat";
+import oAuthCallbackRouter from "./routes/oauth-callback";
+import { requireAuth } from "./middlewares/require-auth";
 
 const app = new Hono();
 
@@ -46,7 +48,12 @@ app.get("/debug-sentry", (_c) => {
 // Health check route (for Render.com)
 app.get("/healthz", (c) => c.json({ status: "ok" }));
 
+// Middlewares
+app.use("/sessions/*", requireAuth);
+
+// App routes
 const routes = app
+  .route("/auth", oAuthCallbackRouter)
   .route("/sessions", sessionsRouter)
   .route("/sessions/:sessionId/chat", chatRouter);
 

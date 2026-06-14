@@ -7,6 +7,7 @@ import * as Sentry from "@sentry/hono/node";
 import { SUPPORTED_CHAT_MODEL_IDS } from "@writ/shared";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
+import type { AuthenticatedEnv } from "../middlewares/require-auth";
 
 const newSessionSchema = z.object({
   title: z.string(),
@@ -46,9 +47,12 @@ const titleValidator = zValidator("json", titleSchema, (result, c) => {
   }
 });
 
-const sessionsRouter = new Hono()
+const sessionsRouter = new Hono<AuthenticatedEnv>()
   .get("/", async (c) => {
+    const userId = c.get("userId");
+
     const sessions = await db.session.findMany({
+      where: { userId },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -64,9 +68,10 @@ const sessionsRouter = new Hono()
     return c.json(sessions);
   })
   .get("/:id", async (c) => {
+    const userId = c.get("userId");
     const id = c.req.param("id");
     const session = await db.session.findUnique({
-      where: { id },
+      where: { userId, id },
       include: {
         messages: { orderBy: { createdAt: "asc" } },
       },
@@ -74,7 +79,7 @@ const sessionsRouter = new Hono()
 
     if (!session) {
       Sentry.logger.warn("Session not found", {
-        userId: "clerk-user", // TODO: integrate Clerk auth
+        userId,
         sessionId: id,
       });
 
@@ -88,12 +93,13 @@ const sessionsRouter = new Hono()
     return c.json(session);
   })
   .post("/", newSessionValidator, async (c) => {
+    const userId = c.get("userId");
     const { prompt, ...newSessiondata } = c.req.valid("json");
 
     const session = await db.session.create({
       data: {
         ...newSessiondata,
-        userId: "clerk-user", // TODO: integrate Clerk auth
+        userId,
         ...(prompt && {
           messages: {
             create: {
