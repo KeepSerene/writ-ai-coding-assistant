@@ -5,3 +5,6 @@ allowBuilds:
   "@sentry-internal/node-cpu-profiler": true
   esbuild: true
   prisma: true
+
+overrides:
+  esbuild: ">=0.28.1"
