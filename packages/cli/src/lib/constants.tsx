@@ -9,6 +9,7 @@ import {
 } from "../components/dialogs";
 import { initiateOAuthLogin } from "./oauth";
 import { clearAuthToken } from "./auth-token-store";
+import { openBillingPortal, openCheckout } from "./billing";
 
 export const EMPTY_BORDER_CONFIG = {
   topLeft: "",
@@ -43,6 +44,7 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
   {
     name: "new",
     description: "Start a new conversation",
+    showWhen: "always",
     command: "/new",
     action: (ctx) => {
       ctx.navigate("/");
@@ -51,6 +53,7 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
   {
     name: "modes",
     description: "Switch modes",
+    showWhen: "always",
     command: "/modes",
     action: (ctx) => {
       ctx.dialog.open({
@@ -64,6 +67,7 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
   {
     name: "models",
     description: "Select an AI model for generation",
+    showWhen: "always",
     command: "/models",
     action: (ctx) => {
       ctx.dialog.open({
@@ -81,6 +85,7 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
   {
     name: "sessions",
     description: "Browse past sessions",
+    showWhen: "authenticated", // Requires DB lookup
     command: "/sessions",
     action: (ctx) => {
       ctx.dialog.open({
@@ -92,6 +97,7 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
   {
     name: "themes",
     description: "Change color theme",
+    showWhen: "always",
     command: "/themes",
     action: (ctx) => {
       ctx.dialog.open({
@@ -132,38 +138,62 @@ export const COMMAND_MENU_ITEMS: CommandMenuItem[] = [
       clearAuthToken();
       ctx.toast.show({
         variant: "success",
-        message: "Signed out successfully!",
+        message: "Signed out successfully",
       });
     },
   },
   {
     name: "upgrade",
-    description: "Buy more credits",
+    description: "Buy more compute credits",
+    showWhen: "authenticated",
     command: "/upgrade",
-    action: (ctx) => {
-      ctx.toast.show({ message: "Opening credits checkout..." });
+    action: async (ctx) => {
+      ctx.toast.show({ message: "Opening checkout..." });
+
+      try {
+        await openCheckout();
+        ctx.toast.show({
+          variant: "success",
+          message: "Checkout opened in browser",
+        });
+      } catch (error) {
+        const errMsg =
+          error instanceof Error ? error.message : "Failed to open checkout";
+        ctx.toast.show({ variant: "error", message: errMsg });
+      }
     },
   },
   {
     name: "usage",
-    description: "Open billing portal on your browser",
+    description: "View remaining credits & invoices",
+    showWhen: "authenticated",
     command: "/usage",
-    action: (ctx) => {
+    action: async (ctx) => {
       ctx.toast.show({ message: "Opening billing portal..." });
+
+      try {
+        await openBillingPortal();
+        ctx.toast.show({
+          variant: "success",
+          message: "Portal opened in browser",
+        });
+      } catch (error) {
+        const errMsg =
+          error instanceof Error ? error.message : "Failed to open portal";
+        ctx.toast.show({ variant: "error", message: errMsg });
+      }
     },
   },
   {
     name: "exit",
     description: "Quit the application",
+    showWhen: "always",
     command: "/exit",
     action: (ctx) => ctx.exit(),
   },
 ] as const;
 
 export const MAX_VISIBLE_COMMAND_ITEMS = 8 as const;
-
-export const COMMAND_COL_WIDTH =
-  Math.max(...COMMAND_MENU_ITEMS.map((item) => item.name.length)) + 4;
 
 export const DEFAULT_TOAST_DURATION = 3000 as const;
 
