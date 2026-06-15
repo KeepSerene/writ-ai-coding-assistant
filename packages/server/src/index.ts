@@ -7,6 +7,8 @@ import sessionsRouter from "./routes/sessions";
 import chatRouter from "./routes/chat";
 import oAuthCallbackRouter from "./routes/oauth-callback";
 import { requireAuth } from "./middlewares/require-auth";
+import billingRouter from "./routes/billing";
+import landingPageHtml from "./views/landing";
 
 const app = new Hono();
 
@@ -45,17 +47,23 @@ app.get("/debug-sentry", (_c) => {
   throw new Error("My first Sentry error!");
 });
 
+// Root route
+app.get("/", (c) => c.html(landingPageHtml));
+
 // Health check route (for Render.com)
 app.get("/healthz", (c) => c.json({ status: "ok" }));
 
 // Middlewares
 app.use("/sessions/*", requireAuth);
+app.use("/billing/checkout", requireAuth);
+app.use("/billing/portal", requireAuth);
 
 // App routes
 const routes = app
   .route("/auth", oAuthCallbackRouter)
   .route("/sessions", sessionsRouter)
-  .route("/sessions/:sessionId/chat", chatRouter);
+  .route("/sessions/:sessionId/chat", chatRouter)
+  .route("/billing", billingRouter);
 
 export type AppType = typeof routes;
 

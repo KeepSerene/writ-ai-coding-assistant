@@ -1,9 +1,6 @@
 import type { RefObject } from "react";
 import { TextAttributes, type ScrollBoxRenderable } from "@opentui/core";
-import {
-  COMMAND_COL_WIDTH,
-  MAX_VISIBLE_COMMAND_ITEMS,
-} from "../../lib/constants";
+import { MAX_VISIBLE_COMMAND_ITEMS } from "../../lib/constants";
 import { useTheme } from "../../providers/theme";
 import type { CommandMenuItem } from "./types";
 
@@ -40,6 +37,9 @@ export default function CommandMenu({
     );
   }
 
+  const colWidth =
+    Math.max(...filteredCmdItems.map((item) => item.command.length)) + 4;
+
   return (
     <scrollbox ref={scrollBoxRef} height={visibleHeight}>
       {filteredCmdItems.map((item, index) => {
@@ -56,7 +56,7 @@ export default function CommandMenu({
             onMouseMove={() => onSelectCmd(index)}
             onMouseDown={() => onExecuteCmd(index)}
           >
-            <box width={COMMAND_COL_WIDTH} flexShrink={0}>
+            <box width={colWidth} flexShrink={0}>
               <text
                 selectable={false}
                 fg={isSelected ? colors.onSelection : colors.onSurface}
