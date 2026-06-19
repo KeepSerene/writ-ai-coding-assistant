@@ -1,26 +1,14 @@
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
-import { Role, Mode, MessageStatus } from "@writ/db/enums";
 import { db } from "@writ/db/client";
-import * as Sentry from "@sentry/hono/node";
-import { SUPPORTED_CHAT_MODEL_IDS } from "@writ/shared";
 import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
 import type { AuthenticatedEnv } from "../middlewares/require-auth";
 import { requireComputeCredits } from "../middlewares/require-compute-credits";
+import { resolveModel } from "../lib/model-resolver";
 
 const newSessionSchema = z.object({
   title: z.string(),
-  cwd: z.string().optional(),
-  prompt: z
-    .object({
-      role: z.enum(Role),
-      content: z.string(),
-      mode: z.enum(Mode),
-      model: z.enum(SUPPORTED_CHAT_MODEL_IDS),
-    })
-    .optional(),
 });
 
 const newSessionValidator = zValidator(
@@ -28,11 +16,6 @@ const newSessionValidator = zValidator(
   newSessionSchema,
   (result, c) => {
     if (!result.success) {
-      Sentry.logger.warn("Session creation validation failed", {
-        path: c.req.path,
-        issues: result.error.issues.length,
-      });
-
       return c.json({ error: "Invalid request body" }, 400);
     }
   },
@@ -62,10 +45,6 @@ const sessionsRouter = new Hono<AuthenticatedEnv>()
       },
     });
 
-    Sentry.logger.info("Sessions found", {
-      count: sessions.length,
-    });
-
     return c.json(sessions);
   })
   .get("/:id", async (c) => {
@@ -73,56 +52,40 @@ const sessionsRouter = new Hono<AuthenticatedEnv>()
     const id = c.req.param("id");
     const session = await db.session.findUnique({
       where: { userId, id },
-      include: {
-        messages: { orderBy: { createdAt: "asc" } },
-      },
     });
 
     if (!session) {
-      Sentry.logger.warn("Session not found", {
-        userId,
-        sessionId: id,
-      });
-
       return c.json({ error: "Session not found" }, 404);
     }
 
-    Sentry.logger.info("Session loaded", {
-      sessionId: session.id,
-    });
-
     return c.json(session);
   })
-  // NEW ADDITION => the requireComputeCredits middleware
   .post("/", requireComputeCredits, newSessionValidator, async (c) => {
     const userId = c.get("userId");
-    const { prompt, ...newSessiondata } = c.req.valid("json");
+    const newSessiondata = c.req.valid("json");
 
     const session = await db.session.create({
       data: {
         ...newSessiondata,
         userId,
-        ...(prompt && {
-          messages: {
-            create: {
-              ...prompt,
-              status: MessageStatus.COMPLETED,
-            },
-          },
-        }),
       },
-      include: { messages: true },
-    });
-
-    Sentry.logger.info("Session created", {
-      sessionId: session.id,
-      title: session.title,
     });
 
     return c.json(session, 201);
   })
   .post("/:id/title", requireComputeCredits, titleValidator, async (c) => {
     const id = c.req.param("id");
+    const userId = c.get("userId");
+
+    const sessionExists = await db.session.findUnique({
+      where: { id, userId },
+      select: { id: true },
+    });
+
+    if (!sessionExists) {
+      return c.json({ error: "Session not found" }, 404);
+    }
+
     const { prompt } = c.req.valid("json");
 
     const buildFallbackTitle = () => {
@@ -131,6 +94,7 @@ const sessionsRouter = new Hono<AuthenticatedEnv>()
         .slice(0, 40)
         .map((s) => s.segment)
         .join("");
+
       return safe.length < prompt.length ? `${safe}...` : safe;
     };
 
@@ -138,22 +102,21 @@ const sessionsRouter = new Hono<AuthenticatedEnv>()
 
     try {
       const { text } = await generateText({
-        model: google("gemini-3.1-flash-lite"),
+        model: resolveModel("gemini-3.1-flash-lite").model,
         prompt: `Generate a concise title (3-6 words) for a coding assistant session based on this user request:\n\n"${prompt}"\n\nRules: Return only the title. No quotes. No trailing punctuation. Capitalize like a title.`,
         maxOutputTokens: 25,
       });
 
       title = text.trim().slice(0, 60);
-      Sentry.logger.info("Session title generated", { sessionId: id });
     } catch (error) {
       title = buildFallbackTitle();
-      Sentry.logger.warn("Title generation failed, using fallback", {
-        sessionId: id,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      console.warn(
+        "[sessions] Title generation failed, using fallback:",
+        error instanceof Error ? error.message : String(error),
+      );
     }
 
-    await db.session.update({ where: { id }, data: { title } });
+    await db.session.update({ where: { id, userId }, data: { title } });
 
     return c.json({ title });
   });

@@ -1,5 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client"
@@ -10,46 +9,19 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Role {
-  USER
-  AGENT
-  ERROR
-}
-
-enum Mode {
-  BUILD
-  PLAN
-}
-
-enum MessageStatus {
-  COMPLETED
-  INTERRUPTED
-}
-
-model Message {
-  id        String        @id @default(cuid())
-  sessionId String
-  role      Role
-  status    MessageStatus
-  mode      Mode
-  model     String
-  content   String
-  blocks    Json?
-  duration  Int?
-  createdAt DateTime      @default(now())
-  session   Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId])
-}
-
 model Session {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   userId    String
   title     String
-  cwd       String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  messages  Message[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  Json     @default("[]")
 
   @@index([userId])
+}
+
+model UserQuota {
+  userId       String   @id
+  messageCount Int      @default(0)
+  windowStart  DateTime @default(now())
 }

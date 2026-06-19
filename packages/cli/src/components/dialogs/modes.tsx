@@ -1,12 +1,12 @@
+import { Mode } from "@writ/shared";
 import { useCallback } from "react";
 import { useDialog } from "../../providers/dialog";
 import FilterListItemsDialog from "./filter-list-items";
-import { Mode } from "@writ/db/enums";
 import { useTheme } from "../../providers/theme";
 
-const AVAILABLE_MODES: Mode[] = [Mode.BUILD, Mode.PLAN];
+const AVAILABLE_MODES: Mode[] = [Mode.Build, Mode.Plan];
 
-const getModeLabel = (mode: Mode) => (mode === Mode.BUILD ? "Build" : "Plan");
+const getModeLabel = (mode: Mode) => (mode === Mode.Build ? "Build" : "Plan");
 
 interface ModesDialogProps {
   currentMode: Mode;

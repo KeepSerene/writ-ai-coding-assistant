@@ -4,12 +4,15 @@ import type { InferResponseType } from "hono/client";
 import apiClient from "../lib/api-client";
 import { z } from "zod";
 import { useToast } from "../providers/toast";
-import { useEffect, useMemo, useState } from "react";
-import { getErrorMessage } from "../lib/utils";
-import { messageContentSchema, type SupportedChatModelId } from "@writ/shared";
-import prettyMilliseconds from "pretty-ms";
-import { useChat, type Message, type UIMessageBlock } from "../hooks/use-chat";
-import { MessageStatus } from "@writ/db/enums";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { extractErrorMessage, getErrorMessage } from "../lib/utils";
+import {
+  DEFAULT_CHAT_MODEL_ID,
+  Mode,
+  SUPPORTED_CHAT_MODEL_IDS,
+  type SupportedChatModelId,
+} from "@writ/shared";
+import { type Message, useAppChat } from "../hooks/use-app-chat";
 import { useInputStack } from "../providers/input-stack";
 import { useKeyboard } from "@opentui/react";
 import { useSessionCtx } from "../providers/session-context";
@@ -33,164 +36,223 @@ const sessionLocationStateSchema = z.object({
       "messages" in val &&
       Array.isArray((val as { messages: unknown }).messages),
   ),
+  initialPrompt: z.object({
+    model: z.enum(SUPPORTED_CHAT_MODEL_IDS),
+    mode: z.enum(Mode),
+    message: z.string(),
+  }),
 });
 
-function formatSessionMessages(
-  sessionMessages: SessionData["messages"],
-): Message[] {
-  return sessionMessages.map((msg) => {
-    if (msg.role === "ERROR") {
-      return { id: msg.id, role: "error", content: msg.content };
-    }
-
-    if (msg.role === "USER") {
-      return {
-        id: msg.id,
-        role: "user",
-        model: msg.model as SupportedChatModelId,
-        mode: msg.mode,
-        content: msg.content,
-      };
-    }
-
-    const parsedContent =
-      msg.blocks != null ? messageContentSchema.safeParse(msg.blocks) : null;
-    const blocks: UIMessageBlock[] = parsedContent?.success
-      ? parsedContent.data.map((block) =>
-          block.type === "tool-use"
-            ? { ...block, status: "done" as const }
-            : block,
-        )
-      : [];
-
-    return {
-      id: msg.id,
-      role: "agent",
-      model: msg.model as SupportedChatModelId,
-      mode: msg.mode,
-      content: msg.content,
-      blocks,
-      ...(msg.duration !== null
-        ? { duration: prettyMilliseconds(msg.duration * 1000) }
-        : {}),
-      isInterrupted: msg.status === MessageStatus.INTERRUPTED,
-    };
-  });
-}
-
-function ChatMessage({ msg }: { msg: Message }) {
+function ChatMessage({
+  msg,
+  isInterrupted,
+  isStreaming,
+}: {
+  msg: Message;
+  isInterrupted?: boolean;
+  isStreaming?: boolean;
+}) {
   if (msg.role === "user") {
-    return <UserPrompt prompt={msg.content} mode={msg.mode} />;
-  }
+    const text = msg.parts
+      .filter((p) => p.type === "text")
+      .map((p) => p.text)
+      .join("");
 
-  if (msg.role === "error") {
-    return <ErrorResponse response={msg.content} />;
+    return <UserPrompt prompt={text} mode={msg.metadata?.mode ?? Mode.Build} />;
   }
 
   return (
     <AgentResponse
-      isStreaming={false}
-      model={msg.model}
-      mode={msg.mode}
-      blocks={msg.blocks}
-      duration={msg.duration}
-      isInterrupted={msg.isInterrupted}
+      model={msg.metadata?.model ?? DEFAULT_CHAT_MODEL_ID}
+      mode={msg.metadata?.mode ?? Mode.Build}
+      blocks={msg.parts}
+      durationMs={msg.metadata?.durationMs}
+      isInterrupted={isInterrupted || msg.metadata?.isInterrupted}
+      isStreaming={isStreaming}
     />
   );
 }
 
-function SessionChat({ session }: { session: SessionData }) {
+interface SessionChatParams {
+  session: SessionData;
+  initialPrompt?: { model: SupportedChatModelId; mode: Mode; message: string };
+}
+
+function SessionChat({ session, initialPrompt }: SessionChatParams) {
   const [title, setTitle] = useState(session.title);
-  const [initialMessages] = useState(() =>
-    formatSessionMessages(session.messages),
+  const [initialMessages] = useState(
+    () => session.messages as unknown as Message[],
   );
+
   const {
     messages,
-    streamState,
-    handleSubmit,
-    abortAgentStream,
-    interruptGeneration,
-  } = useChat(session.id, initialMessages);
+    status,
+    error,
+    submit,
+    abort,
+    wasInterrupted,
+    regenerate,
+    quotaError,
+  } = useAppChat(session.id, initialMessages);
   const { isTopLayer } = useInputStack();
   const { model, mode } = useSessionCtx();
 
-  // Generate a real title only for brand-new sessions: exactly 1 message, USER role.
-  useEffect(() => {
-    const firstMsg = session.messages[0];
+  const hasSubmittedPromptRef = useRef(false);
+  const hasFetchedTitleRef = useRef(false);
+  const abortRef = useRef(abort);
 
-    if (session.messages.length !== 1 || firstMsg?.role !== "USER") return;
+  const isInFlight = status === "streaming" || status === "submitted";
+  const isNewSession = initialMessages.length === 0;
+  const isLastMsgOfAgent = messages.at(-1)?.role === "assistant";
+
+  // Keep the ref constantly updated with the latest abort function
+  useEffect(() => {
+    abortRef.current = abort;
+  }, [abort]);
+
+  // Generate title after the first assistant response lands in a new session
+  useEffect(() => {
+    if (!isNewSession || hasFetchedTitleRef.current) return;
+
+    const firstUserMsg = messages.find((m) => m.role === "user");
+    const hasAssistantResponse = messages.some((m) => m.role === "assistant");
+
+    if (!firstUserMsg || !hasAssistantResponse) return;
+
+    hasFetchedTitleRef.current = true;
+
+    const prompt = firstUserMsg.parts
+      .filter(
+        (
+          p,
+        ): p is Extract<
+          (typeof firstUserMsg.parts)[number],
+          { type: "text" }
+        > => p.type === "text",
+      )
+      .map((p) => p.text)
+      .join("");
+
+    if (!prompt) return;
 
     let shouldIgnore = false;
 
-    const fetchTitle = async () => {
+    void (async () => {
       try {
         const res = await apiClient.sessions[":id"].title.$post({
           param: { id: session.id },
-          json: { prompt: firstMsg.content },
+          json: { prompt },
         });
 
-        // Abort state update if component unmounted or request failed
         if (shouldIgnore || !res.ok) return;
 
         const data = await res.json();
+
         if (data.title) setTitle(data.title);
       } catch (error) {
         console.error("Failed to fetch title:", error);
-        // Swallow
       }
-    };
-
-    fetchTitle();
+    })();
 
     return () => {
       shouldIgnore = true;
     };
-  }, []);
+  }, [messages, isNewSession, session.id]);
 
-  // Stop pending agent stream chunks when user leaves the session (on unmount)
+  // Stop pending agent stream chunks ONLY when user leaves the session (on true unmount)
   useEffect(() => {
     return () => {
-      abortAgentStream();
+      abortRef.current();
     };
-  }, [abortAgentStream]);
+  }, []);
 
-  // Let user cancel a reply even before the first streamed chunk arrives
+  // Auto-regenerate when the session was loaded with an unanswered user message
+  // This happens when the previous request errored before producing a response
+  const hasAutoRegeneratedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasAutoRegeneratedRef.current) return;
+    // Don't interfere with new-session flow (initialPrompt handled separately)
+    if (initialPrompt) return;
+    if (status !== "ready") return;
+
+    const lastMsg = messages.at(-1);
+
+    if (!lastMsg || lastMsg.role !== "user") return;
+
+    hasAutoRegeneratedRef.current = true;
+    void regenerate();
+  }, [status, messages, initialPrompt, regenerate]);
+
+  // Interrupt and regenerate
   useKeyboard((key) => {
+    if (key.name === "escape" && isTopLayer("base") && status === "streaming") {
+      key.preventDefault();
+      abort();
+    }
+
     if (
-      key.name === "escape" &&
+      key.ctrl &&
+      key.name === "r" &&
       isTopLayer("base") &&
-      streamState.status === "streaming"
+      status !== "streaming" &&
+      status !== "submitted" &&
+      messages.at(-1)?.role === "assistant"
     ) {
       key.preventDefault();
-      interruptGeneration();
+      void regenerate();
     }
   });
+
+  useEffect(() => {
+    if (!initialPrompt || hasSubmittedPromptRef.current) return;
+
+    hasSubmittedPromptRef.current = true;
+
+    // Defer the initial submission slightly to bypass React StrictMode's
+    // instant mount -> unmount -> remount cycle, preventing premature aborts
+    const timeoutId = setTimeout(() => {
+      void submit({
+        prompt: initialPrompt.message,
+        model: initialPrompt.model,
+        mode: initialPrompt.mode,
+      });
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [submit, initialPrompt]);
 
   return (
     <SessionShell
       title={title}
-      isLoading={streamState.status === "streaming"}
-      canInterrupt={streamState.status === "streaming"}
+      isLoading={isInFlight}
+      canInterrupt={isInFlight}
+      canRegenerate={!isInFlight && isLastMsgOfAgent}
       onSubmit={(prompt) => {
-        handleSubmit({ prompt, model, mode });
+        submit({ prompt, model, mode });
       }}
+      promptAreaDisabled={Boolean(quotaError) || isInFlight}
+      quotaError={quotaError}
     >
-      {messages.map((msg) => (
-        <ChatMessage key={msg.id} msg={msg} />
+      {messages.map((msg, index) => (
+        <ChatMessage
+          key={msg.id}
+          msg={msg}
+          isStreaming={
+            (status === "streaming" || status === "submitted") &&
+            index === messages.length - 1 &&
+            msg.role === "assistant"
+          }
+          isInterrupted={
+            wasInterrupted &&
+            index === messages.length - 1 &&
+            msg.role === "assistant"
+          }
+        />
       ))}
 
-      {/* Streaming response must be rendered AFTER messages so it sits at the
-          bottom of the scrollbox. stickyScroll + stickyStart="bottom" anchors
-          the viewport to the last child — if this were first, the sticky anchor
-          would land on the historical messages and never scroll up to follow the
-          stream. */}
-      {streamState.status === "streaming" && streamState.blocks.length > 0 && (
-        <AgentResponse
-          isStreaming
-          blocks={streamState.blocks}
-          model={streamState.model}
-          mode={streamState.mode}
-        />
+      {error && !quotaError && (
+        <ErrorResponse response={extractErrorMessage(error)} />
       )}
     </SessionShell>
   );
@@ -202,16 +264,18 @@ export default function SessionScreen() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const prefetchedSession = useMemo(() => {
+  const prefetchedSessionData = useMemo(() => {
     const parsed = sessionLocationStateSchema.safeParse(location.state);
 
-    return parsed.success ? parsed.data.session : null;
+    return parsed.success ? parsed.data : null;
   }, [location.state]);
 
-  const [session, setSession] = useState(prefetchedSession);
+  const [session, setSession] = useState<SessionData | null>(
+    prefetchedSessionData?.session ?? null,
+  );
 
   useEffect(() => {
-    if (!sessionId || prefetchedSession) return;
+    if (!sessionId || prefetchedSessionData?.session) return;
 
     setSession(null);
 
@@ -249,11 +313,17 @@ export default function SessionScreen() {
     return () => {
       shouldIgnore = true;
     };
-  }, [sessionId, prefetchedSession, toast, navigate]);
+  }, [sessionId, prefetchedSessionData, toast, navigate]);
 
   if (!session) {
     return <SessionShell onSubmit={() => {}} promptAreaDisabled isLoading />;
   }
 
-  return <SessionChat key={session.id} session={session} />;
+  return (
+    <SessionChat
+      key={session.id}
+      session={session}
+      initialPrompt={prefetchedSessionData?.initialPrompt}
+    />
+  );
 }

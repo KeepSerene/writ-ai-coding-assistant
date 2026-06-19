@@ -1,4 +1,4 @@
-import { Mode } from "@writ/db/enums";
+import { Mode } from "@writ/shared";
 import { useSessionCtx } from "../providers/session-context";
 import { useTheme } from "../providers/theme";
 
@@ -18,7 +18,7 @@ function Header() {
       <ascii-font
         font="tiny"
         text="Writ"
-        color={mode === Mode.BUILD ? colors.primary : colors.secondary}
+        color={mode === Mode.Build ? colors.primary : colors.secondary}
       />
     </box>
   );

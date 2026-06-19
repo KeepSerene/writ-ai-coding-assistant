@@ -1,14 +1,6 @@
-import type { Mode } from "@writ/db/enums";
+import { Mode } from "@writ/shared";
 
-interface SystemPromptParams {
-  cwd: string | null;
-  mode: Mode;
-}
-
-export default function buildSystemPrompt({
-  cwd,
-  mode,
-}: SystemPromptParams): string {
+export default function buildSystemPrompt(mode: Mode): string {
   const instructions: string[] = [];
 
   // Identity & core persona
@@ -25,12 +17,7 @@ export default function buildSystemPrompt({
   `.trim(),
   );
 
-  // 2. Environment context
-  if (cwd) {
-    instructions.push(`\n**Current Working Directory:** \`${cwd}\``);
-  }
-
-  // 3. Global tool rules (applies to all modes)
+  //  Global tool rules (applies to all modes)
   instructions.push(
     `
     ### Global Rules & Tool Efficiency
@@ -42,7 +29,7 @@ export default function buildSystemPrompt({
   );
 
   // Mode-specific instructions
-  if (mode === "PLAN") {
+  if (mode === Mode.Plan) {
     instructions.push(
       `
     ### Mode: PLAN (Read-Only)
@@ -57,7 +44,7 @@ export default function buildSystemPrompt({
     - **Clarify:** If the user's request is ambiguous or missing context, point out the missing pieces and ask clarifying questions before finalizing your plan.
     `.trim(),
     );
-  } else if (mode === "BUILD") {
+  } else if (mode === Mode.Build) {
     instructions.push(
       `
     ### Mode: BUILD (Read & Write)

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SPLIT_BORDER_CONFIG, TEXTAREA_KEY_BINDINGS } from "../lib/constants";
 import CommandMenu from "./command-menu";
 import SessionContext from "./session-context";
-import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
+import {
+  type ScrollBoxRenderable,
+  type TextareaRenderable,
+} from "@opentui/core";
 import { useKeyboard, useRenderer } from "@opentui/react";
 import useCommandMenu from "../hooks/use-command-menu";
 import type { CommandMenuItem } from "./command-menu/types";
@@ -12,21 +15,28 @@ import { useDialog } from "../providers/dialog";
 import { useTheme } from "../providers/theme";
 import { useNavigate } from "react-router";
 import { useSessionCtx } from "../providers/session-context";
-import { Mode } from "@writ/db/enums";
+import { Mode } from "@writ/shared";
 import {
+  findActiveCommand,
   findActiveMention,
   getMentionCandidates,
   type ActiveMentionContext,
   type MentionCandidate,
 } from "../lib/utils";
-import MentionMenu from "./MentionMenu";
+import MentionMenu from "./mention-menu";
+import { format } from "date-fns";
 
 interface PromptAreaProps {
   onSubmit: (prompt: string) => void;
   disabled?: boolean;
+  quotaError?: { resetsAt: string } | null;
 }
 
-function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
+function PromptArea({
+  onSubmit,
+  disabled = false,
+  quotaError = null,
+}: PromptAreaProps) {
   const [activeMention, setActiveMention] =
     useState<ActiveMentionContext | null>(null);
   const [mentionCandidates, setMentionCandidates] = useState<
@@ -67,21 +77,53 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
 
       if (!textarea || !cmdItem) return;
 
-      textarea.setText("");
+      const text = textarea.plainText;
+      const commandCtx = findActiveCommand(text, textarea.cursorOffset);
 
-      if (cmdItem.action) {
-        cmdItem.action({
-          exit: () => renderer.destroy(),
-          toast,
-          dialog,
-          navigate,
-          mode,
-          setMode,
-          model,
-          setModel,
-        });
+      if (commandCtx) {
+        // Slice out the command token
+        const before = text.slice(0, commandCtx.startIndex);
+        const after = text.slice(commandCtx.endIndex);
+
+        if (cmdItem.action) {
+          // Remove only the command token, preserving the user's surrounding text
+          textarea.replaceText(before + after);
+          textarea.cursorOffset = commandCtx.startIndex;
+
+          cmdItem.action({
+            exit: () => renderer.destroy(),
+            toast,
+            dialog,
+            navigate,
+            mode,
+            setMode,
+            model,
+            setModel,
+          });
+        } else {
+          // Replace token with full command string (for text-replacement commands)
+          const commandStr = cmdItem.command + " ";
+          textarea.replaceText(before + commandStr + after);
+          textarea.cursorOffset = commandCtx.startIndex + commandStr.length;
+        }
       } else {
-        textarea.insertText(cmdItem.command + " ");
+        // Fallback: If context is lost, clear the text
+        textarea.setText("");
+
+        if (cmdItem.action) {
+          cmdItem.action({
+            exit: () => renderer.destroy(),
+            toast,
+            dialog,
+            navigate,
+            mode,
+            setMode,
+            model,
+            setModel,
+          });
+        } else {
+          textarea.insertText(cmdItem.command + " ");
+        }
       }
     },
     [renderer, toast, dialog, navigate, mode, setMode, model, setModel],
@@ -185,7 +227,7 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
     if (!textarea) return;
 
     const text = textarea.plainText;
-    handleInputChange(text);
+    handleInputChange(text, textarea.cursorOffset);
     syncMentionMenuUI(text, textarea.cursorOffset);
   }, [handleInputChange, syncMentionMenuUI]);
 
@@ -319,7 +361,13 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
       <box
         width="100%"
         border={["left"]}
-        borderColor={mode === Mode.BUILD ? colors.primary : colors.secondary}
+        borderColor={
+          quotaError
+            ? colors.warning
+            : mode === Mode.Build
+              ? colors.primary
+              : colors.secondary
+        }
         customBorderChars={{
           ...SPLIT_BORDER_CONFIG.customBorderChars,
           bottomLeft: "╹",
@@ -383,13 +431,28 @@ function PromptArea({ onSubmit, disabled = false }: PromptAreaProps) {
             keyBindings={TEXTAREA_KEY_BINDINGS}
             onContentChange={handleContentChange}
             onCursorChange={handleCursorPosChange}
-            cursorColor={colors.primary}
+            cursorColor={quotaError ? colors.warning : colors.primary}
             textColor={colors.onSurface}
-            placeholder='Ask anything... "Fix a bug in the database"'
+            placeholder="Ask anything... [ / commands ] [ @ files ]"
           />
 
-          <SessionContext />
+          <SessionContext quotaError={quotaError} />
         </box>
+
+        {quotaError && (
+          <box
+            width="100%"
+            paddingX={2}
+            paddingY={1}
+            backgroundColor={colors.warning}
+          >
+            <text fg={colors.onWarning}>
+              Demo limit reached (3/3). Quota resets{" "}
+              {format(new Date(quotaError.resetsAt), "MMM d, yyyy 'at' h:mm a")}
+              .
+            </text>
+          </box>
+        )}
       </box>
     </box>
   );

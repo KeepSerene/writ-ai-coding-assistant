@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Writ Favicon</title>
+  
+  <desc>Pixel-art quill nib mark in cyan-teal, the simplified icon form of the Writ logo.</desc>
+
+  <rect width="32" height="32" fill="none"/>
+
+  <g fill="#009688">
+    <rect x="4" y="6" width="10" height="6"/>
+    <rect x="10" y="12" width="6" height="8"/>
+    <rect x="18" y="6" width="10" height="6"/>
+    <rect x="16" y="12" width="6" height="8"/>
+    <polygon points="10,20 22,20 16,28"/>
+  </g>
+</svg>

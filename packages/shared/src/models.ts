@@ -117,7 +117,8 @@ export const SUPPORTED_CHAT_MODEL_IDS = SUPPORTED_CHAT_MODELS.map(
   (m) => m.id,
 ) as [SupportedChatModelId, ...SupportedChatModelId[]];
 
-export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "gemini-3.5-flash";
+export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId =
+  "openai/gpt-oss-120b";
 
 export function findSupportedChatModel(modelId: string) {
   return SUPPORTED_CHAT_MODELS.find((model) => model.id === modelId);
