@@ -10,13 +10,13 @@ const landingPageHtml = `
 
   <style>
     :root {
+      --primary: #009688;
       --base: #0d1117;
       --mantle: #161b22;
       --text: #e6edf3;
       --subtext0: #8b949e;
       --surface0: #21262d;
       --surface1: #30363d;
-      --primary: #009688;
     }
 
     * {

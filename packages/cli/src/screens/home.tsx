@@ -5,6 +5,7 @@ import PromptArea from "../components/prompt-area";
 import { useSessionCtx } from "../providers/session-context";
 import { useTheme } from "../providers/theme";
 import { TextAttributes } from "@opentui/core";
+import { Mode } from "@writ/shared";
 
 export default function HomeScreen() {
   const navigate = useNavigate();
@@ -51,6 +52,24 @@ export default function HomeScreen() {
             &rsaquo; modes
           </text>
         </box>
+      </box>
+
+      <box position="absolute" bottom={1} right={2} flexDirection="row" gap={1}>
+        <text attributes={TextAttributes.DIM} fg={colors.onBackground}>
+          Developed by
+        </text>
+
+        <text fg={mode === Mode.Build ? colors.primary : colors.secondary}>
+          @KeepSerene
+        </text>
+
+        <text attributes={TextAttributes.DIM} fg={colors.onBackground}>
+          |
+        </text>
+
+        <text fg={mode === Mode.Build ? colors.primary : colors.secondary}>
+          https://math-to-dev.vercel.app
+        </text>
       </box>
     </box>
   );

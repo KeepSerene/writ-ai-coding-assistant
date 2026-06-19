@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { useLocation, useNavigate } from "react-router";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SessionShell from "../components/session-shell";
 import UserPrompt from "../components/chat-messages/user-prompt";
 import { useToast } from "../providers/toast";
@@ -15,6 +15,10 @@ const newSessionLocationStateSchema = z.object({
 });
 
 export default function NewSessionScreen() {
+  const [quotaError, setQuotaError] = useState<{ resetsAt: string } | null>(
+    null,
+  );
+
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
@@ -47,6 +51,21 @@ export default function NewSessionScreen() {
 
         if (shouldIgnore) return;
 
+        const fetchRes = response as unknown as Response;
+
+        if (fetchRes.status === 429) {
+          const data = (await fetchRes
+            .clone()
+            .json()
+            .catch(() => null)) as { resetsAt?: string } | null;
+
+          setQuotaError({
+            resetsAt: data?.resetsAt ?? new Date().toISOString(),
+          });
+
+          return; // Stop execution, don't navigate!
+        }
+
         if (!response.ok) {
           throw new Error(await getErrorMessage(response));
         }
@@ -60,7 +79,6 @@ export default function NewSessionScreen() {
         if (shouldIgnore) return;
 
         console.error("Failed to create session:", error);
-
         toast.show({
           variant: "error",
           message:
@@ -80,7 +98,12 @@ export default function NewSessionScreen() {
   if (!locationState) return null;
 
   return (
-    <SessionShell onSubmit={() => {}} promptAreaDisabled isLoading>
+    <SessionShell
+      onSubmit={() => {}}
+      promptAreaDisabled
+      isLoading={!quotaError}
+      quotaError={quotaError}
+    >
       <UserPrompt prompt={locationState.message} mode={locationState.mode} />
     </SessionShell>
   );

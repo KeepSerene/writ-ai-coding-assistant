@@ -6,6 +6,7 @@ import { generateText } from "ai";
 import type { AuthenticatedEnv } from "../middlewares/require-auth";
 import { requireComputeCredits } from "../middlewares/require-compute-credits";
 import { resolveModel } from "../lib/model-resolver";
+import { requirePortfolioQuota } from "../middlewares/require-portfolio-quota";
 
 const newSessionSchema = z.object({
   title: z.string(),
@@ -60,19 +61,25 @@ const sessionsRouter = new Hono<AuthenticatedEnv>()
 
     return c.json(session);
   })
-  .post("/", requireComputeCredits, newSessionValidator, async (c) => {
-    const userId = c.get("userId");
-    const newSessiondata = c.req.valid("json");
+  .post(
+    "/",
+    requirePortfolioQuota,
+    requireComputeCredits,
+    newSessionValidator,
+    async (c) => {
+      const userId = c.get("userId");
+      const newSessiondata = c.req.valid("json");
 
-    const session = await db.session.create({
-      data: {
-        ...newSessiondata,
-        userId,
-      },
-    });
+      const session = await db.session.create({
+        data: {
+          ...newSessiondata,
+          userId,
+        },
+      });
 
-    return c.json(session, 201);
-  })
+      return c.json(session, 201);
+    },
+  )
   .post("/:id/title", requireComputeCredits, titleValidator, async (c) => {
     const id = c.req.param("id");
     const userId = c.get("userId");
