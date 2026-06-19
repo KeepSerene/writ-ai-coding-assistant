@@ -43,6 +43,7 @@ const landingPageHtml = `
       object-fit: conver;
       margin-bottom: 1rem;
       filter: drop-shadow(0 4px 12px rgba(0, 150, 136, 0.2)); 
+      user-select: none;
     }
 
     h1 {
@@ -124,7 +125,7 @@ const landingPageHtml = `
 </head>
 
 <body>
-  <img src="/assets/logo.webp" alt="Writ Logo" class="logo">
+  <img src="/assets/logo.webp" alt="Writ Logo" class="logo" draggable="false">
   
   <h1>Writ Server</h1>
 
