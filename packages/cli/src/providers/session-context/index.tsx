@@ -1,5 +1,8 @@
-import { Mode } from "@writ/db/enums";
-import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@writ/shared";
+import {
+  DEFAULT_CHAT_MODEL_ID,
+  Mode,
+  type SupportedChatModelId,
+} from "@writ/shared";
 import {
   createContext,
   useCallback,
@@ -31,13 +34,13 @@ export function useSessionCtx(): SessionCtxContextValue {
 export function SessionCtxProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const [mode, setMode] = useState<Mode>(Mode.BUILD);
+  const [mode, setMode] = useState<Mode>(Mode.Build);
   const [model, setModel] = useState<SupportedChatModelId>(
     DEFAULT_CHAT_MODEL_ID,
   );
 
   const toggleMode = useCallback(() => {
-    setMode((prev) => (prev === Mode.BUILD ? Mode.PLAN : Mode.BUILD));
+    setMode((prev) => (prev === Mode.Build ? Mode.Plan : Mode.Build));
   }, [setMode]);
 
   return (

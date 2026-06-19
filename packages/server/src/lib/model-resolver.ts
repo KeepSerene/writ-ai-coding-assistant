@@ -24,20 +24,6 @@ type CerebrasModelId = Extract<
 >["id"];
 type NimModelId = Extract<SupportedChatModel, { provider: "nim" }>["id"];
 
-const nimApiKey = process.env["NIM_API_KEY"];
-
-if (!nimApiKey) {
-  throw new Error("NIM_API_KEY is missing in the environment");
-}
-
-const nim = createOpenAICompatible({
-  name: "nim",
-  baseURL: "https://integrate.api.nvidia.com/v1",
-  headers: {
-    Authorization: `Bearer ${nimApiKey}`,
-  },
-});
-
 export interface ResolvedModel {
   model: LanguageModel;
   modelId: SupportedChatModelId;
@@ -148,11 +134,17 @@ function resolveCerebrasModel(modelId: CerebrasModelId): ResolvedModel {
 }
 
 function resolveNimModel(modelId: NimModelId): ResolvedModel {
-  return {
-    model: nim(modelId),
-    modelId,
-    provider: "nim",
-  };
+  const nimApiKey = process.env["NIM_API_KEY"];
+
+  if (!nimApiKey) throw new Error("NIM_API_KEY is missing in the environment");
+
+  const nim = createOpenAICompatible({
+    name: "nim",
+    baseURL: "https://integrate.api.nvidia.com/v1",
+    headers: { Authorization: `Bearer ${nimApiKey}` },
+  });
+
+  return { model: nim(modelId), modelId, provider: "nim" };
 }
 
 function resolveSupportedChatModel(model: SupportedChatModel): ResolvedModel {

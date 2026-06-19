@@ -5,13 +5,12 @@ import SessionShell from "../components/session-shell";
 import UserPrompt from "../components/chat-messages/user-prompt";
 import { useToast } from "../providers/toast";
 import apiClient from "../lib/api-client";
-import { SUPPORTED_CHAT_MODEL_IDS } from "@writ/shared";
+import { modeSchema, SUPPORTED_CHAT_MODEL_IDS } from "@writ/shared";
 import { getErrorMessage } from "../lib/utils";
-import { Mode } from "@writ/db/enums";
 
 const newSessionLocationStateSchema = z.object({
   model: z.enum(SUPPORTED_CHAT_MODEL_IDS),
-  mode: z.enum(Mode),
+  mode: modeSchema,
   message: z.string(),
 });
 
@@ -43,16 +42,7 @@ export default function NewSessionScreen() {
     const createSession = async () => {
       try {
         const response = await apiClient.sessions.$post({
-          json: {
-            title: "New session",
-            cwd: process.cwd(),
-            prompt: {
-              role: "USER",
-              model: locationState.model,
-              mode: locationState.mode,
-              content: locationState.message,
-            },
-          },
+          json: { title: "New Session" },
         });
 
         if (shouldIgnore) return;
@@ -64,7 +54,7 @@ export default function NewSessionScreen() {
         const session = await response.json();
         navigate(`/sessions/${session.id}`, {
           replace: true,
-          state: { session },
+          state: { session, initialPrompt: locationState },
         });
       } catch (error) {
         if (shouldIgnore) return;

@@ -1,10 +1,6 @@
-import { config } from "dotenv";
-import { resolve } from "node:path";
 import { hc } from "hono/client";
 import type { AppType } from "@writ/server";
 import { clearAuthToken, getAuthToken } from "./auth-token-store";
-
-config({ path: resolve(import.meta.dirname, "../../../../.env") });
 
 const apiBaseUrl = process.env["API_BASE_URL"];
 

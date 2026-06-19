@@ -3,12 +3,14 @@ import { serve } from "@hono/node-server";
 import { HTTPException } from "hono/http-exception";
 import { sentry } from "@sentry/hono/node";
 import * as Sentry from "@sentry/hono/node";
+import { join } from "node:path";
+import landingPageHtml from "./views/landing";
 import sessionsRouter from "./routes/sessions";
 import chatRouter from "./routes/chat";
 import oAuthCallbackRouter from "./routes/oauth-callback";
 import { requireAuth } from "./middlewares/require-auth";
 import billingRouter from "./routes/billing";
-import landingPageHtml from "./views/landing";
+import { readFileSync } from "node:fs";
 
 const app = new Hono();
 
@@ -47,6 +49,30 @@ app.get("/debug-sentry", (_c) => {
   throw new Error("My first Sentry error!");
 });
 
+// Serve the logo
+const logoWebp = readFileSync(
+  join(import.meta.dirname, "../../assets/logo.webp"),
+);
+
+app.get("/assets/logo.webp", (c) => {
+  return c.body(logoWebp, 200, {
+    "Content-Type": "image/webp",
+    "Cache-Control": "public, max-age=86400", // Cache it for 1 day
+  });
+});
+
+// Serve the favicon
+const faviconSvg = readFileSync(
+  join(import.meta.dirname, "../../assets/favicon.svg"),
+);
+
+app.get("/favicon.svg", (c) => {
+  return c.body(faviconSvg, 200, {
+    "Content-Type": "image/svg+xml",
+    "Cache-Control": "public, max-age=86400", // Cache it for 1 day
+  });
+});
+
 // Root route
 app.get("/", (c) => c.html(landingPageHtml));
 
@@ -54,6 +80,7 @@ app.get("/", (c) => c.html(landingPageHtml));
 app.get("/healthz", (c) => c.json({ status: "ok" }));
 
 // Middlewares
+app.use("/sessions", requireAuth);
 app.use("/sessions/*", requireAuth);
 app.use("/billing/checkout", requireAuth);
 app.use("/billing/portal", requireAuth);

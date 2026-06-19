@@ -1,7 +1,7 @@
 import type { ScrollBoxRenderable } from "@opentui/core";
 import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
 import type { CommandMenuItem } from "../components/command-menu/types";
-import { getFilteredCmdItems } from "../lib/utils";
+import { findActiveCommand, getFilteredCmdItems } from "../lib/utils";
 import { useKeyboard } from "@opentui/react";
 import { useInputStack } from "../providers/input-stack";
 import { COMMAND_MENU_ITEMS } from "../lib/constants";
@@ -12,7 +12,7 @@ interface CommandMenuControls {
   showCmdMenu: boolean;
   selectedCmdIndex: number;
   setSelectedCmdIndex: (index: number) => void;
-  handleInputChange: (inputStr: string) => void;
+  handleInputChange: (inputStr: string, cursorOffset: number) => void;
   resolveCmdItem: (index: number) => CommandMenuItem | undefined;
   scrollBoxRef: RefObject<ScrollBoxRenderable | null>;
 }
@@ -26,9 +26,14 @@ export default function useCommandMenu(): CommandMenuControls {
 
   const { pushLayer, popLayer, isTopLayer } = useInputStack();
 
-  // Extract the command query by stripping the leading "/" if the menu is active
-  const cmdQuery =
-    showCmdMenu && userInput.startsWith("/") ? userInput.slice(1) : "";
+  const cmdQuery = (() => {
+    if (!showCmdMenu) return "";
+
+    // find the command token nearest end of input as a best-effort for filtering
+    const match = /(?:^|\s)(\/([^/\s]*))$/.exec(userInput);
+
+    return match?.[2] ?? "";
+  })();
 
   const isAuthenticated = Boolean(getAuthToken());
   const filteredCmdItems = useMemo(() => {
@@ -49,19 +54,16 @@ export default function useCommandMenu(): CommandMenuControls {
     popLayer("command-menu");
   };
 
-  const handleInputChange = (inputStr: string) => {
+  const handleInputChange = (inputStr: string, cursorOffset: number) => {
     setUserInput(inputStr);
-    setSelectedCmdIndex(0); // Reset selection to the top when query changes
+    setSelectedCmdIndex(0);
 
     const scrollBox = scrollBoxRef.current;
+    if (scrollBox) scrollBox.scrollTo(0);
 
-    if (scrollBox) {
-      scrollBox.scrollTo(0); // Reset scroll position to top when query changes
-    }
+    const activeCommand = findActiveCommand(inputStr, cursorOffset);
 
-    const suffix = inputStr.startsWith("/") ? inputStr.slice(1) : null;
-
-    if (suffix !== null && !suffix.includes(" ")) {
+    if (activeCommand) {
       setShowCmdMenu(true);
       pushLayer("command-menu", () => {
         closeMenu();

@@ -5,7 +5,7 @@
   "private": true,
   "author": "Dhrubajyoti Bhattacharjee",
   "scripts": {
-    "dev": "bun run --watch src/index.tsx"
+    "dev": "bun run --env-file=../../.env --watch src/index.tsx"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -19,12 +19,9 @@
     "@ai-sdk/react": "3.0.199",
     "@opentui/core": "^0.2.16",
     "@opentui/react": "^0.2.16",
-    "@writ/db": "workspace:*",
     "@writ/shared": "workspace:*",
     "ai": "6.0.39",
     "date-fns": "4.4.0",
-    "dotenv": "^17.4.2",
-    "eventsource-parser": "3.1.0",
     "hono": "^4.12.23",
     "open": "11.0.0",
     "opentui-spinner": "^0.0.6",

@@ -4,8 +4,7 @@ import PromptArea from "./prompt-area";
 import { TextAttributes } from "@opentui/core";
 import { useTheme } from "../providers/theme";
 import { useSessionCtx } from "../providers/session-context";
-import { Mode } from "@writ/db/enums";
-import { SPLIT_BORDER_CONFIG } from "../lib/constants";
+import { Mode } from "@writ/shared";
 
 interface SessionShellProps {
   children?: ReactNode;
@@ -14,6 +13,8 @@ interface SessionShellProps {
   promptAreaDisabled?: boolean;
   isLoading?: boolean;
   canInterrupt?: boolean;
+  canRegenerate?: boolean;
+  quotaError?: { resetsAt: string } | null;
 }
 
 function SessionShell({
@@ -23,6 +24,8 @@ function SessionShell({
   promptAreaDisabled = false,
   isLoading = false,
   canInterrupt = false,
+  canRegenerate = false,
+  quotaError = null,
 }: SessionShellProps) {
   const {
     currentTheme: { colors },
@@ -43,16 +46,17 @@ function SessionShell({
         <box
           flexShrink={0}
           width="100%"
-          border={["left"]}
-          borderColor={colors.onBackground}
-          customBorderChars={{
-            ...SPLIT_BORDER_CONFIG.customBorderChars,
-            bottomLeft: "╹",
-          }}
-          paddingX={1}
-          zIndex={50}
+          flexDirection="row"
+          alignItems="center"
+          gap={1}
         >
-          <text fg={colors.onBackground}>{title}</text>
+          <text attributes={TextAttributes.DIM} fg={colors.primary}>
+            ┃
+          </text>
+
+          <text attributes={TextAttributes.DIM} fg={colors.onBackground}>
+            {title}
+          </text>
         </box>
       )}
 
@@ -63,7 +67,11 @@ function SessionShell({
       )}
 
       <box marginTop={children ? undefined : "auto"} flexShrink={0}>
-        <PromptArea onSubmit={onSubmit} disabled={promptAreaDisabled} />
+        <PromptArea
+          onSubmit={onSubmit}
+          disabled={promptAreaDisabled}
+          quotaError={quotaError}
+        />
       </box>
 
       <box
@@ -75,18 +83,26 @@ function SessionShell({
         justifyContent="space-between"
         gap={2}
       >
-        {isLoading && (
-          <box flexDirection="row" alignItems="center" gap={2}>
-            <spinner
-              name="aesthetic"
-              color={mode === Mode.BUILD ? colors.primary : colors.secondary}
-            />
+        <box flexDirection="row" alignItems="center" gap={2}>
+          {isLoading ? (
+            <>
+              <spinner
+                name="aesthetic"
+                color={mode === Mode.Build ? colors.primary : colors.secondary}
+              />
 
-            {canInterrupt && (
-              <text fg={colors.onBackground}>Esc to interrupt</text>
-            )}
-          </box>
-        )}
+              {canInterrupt && (
+                <text attributes={TextAttributes.DIM} fg={colors.onBackground}>
+                  Esc to interrupt
+                </text>
+              )}
+            </>
+          ) : canRegenerate ? (
+            <text attributes={TextAttributes.DIM} fg={colors.onBackground}>
+              ^R &rsaquo; regenerate
+            </text>
+          ) : null}
+        </box>
 
         <box marginLeft="auto" flexShrink={0} flexDirection="row" gap={1}>
           <text fg={colors.onBackground}>Tab</text>

@@ -1,7 +1,6 @@
-import type { Mode } from "@writ/db/enums";
 import type { DialogContextValue } from "../../providers/dialog";
 import type { ToastContextValue } from "../../providers/toast";
-import type { SupportedChatModelId } from "@writ/shared";
+import type { Mode, SupportedChatModelId } from "@writ/shared";
 
 export interface CommandContext {
   exit: () => void;

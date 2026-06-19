@@ -1,40 +1,57 @@
-import { MessageStatus, Mode } from "@writ/db/enums";
 import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
 import {
-  messageContentSchema,
-  SUPPORTED_CHAT_MODEL_IDS,
-  toolInputSchema,
-  type AgentStreamEvent,
-  type MessageBlock,
-  type SupportedChatModelId,
-} from "@writ/shared";
-import { type SSEStreamingApi, streamSSE } from "hono/streaming";
-import { isChatModelSupported, resolveModel } from "../lib/model-resolver";
-import {
-  stepCountIs,
+  convertToModelMessages,
+  consumeStream,
   streamText,
-  type JSONValue,
-  type LanguageModelUsage,
+  validateUIMessages,
   type ModelMessage,
-  type TextPart,
-  type ToolCallPart,
-  type ToolResultPart,
+  type InferUITools,
+  type LanguageModelUsage,
+  type UIMessage,
 } from "ai";
-import { db } from "@writ/db/client";
+import {
+  getToolContracts,
+  modeSchema,
+  SUPPORTED_CHAT_MODEL_IDS,
+  type AppMessageMetadata,
+  type ToolContracts,
+} from "@writ/shared";
+import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
-import type { Prisma } from "@writ/db";
-import createTools from "../tools";
-import buildSystemPrompt from "../lib/system-prompt";
 import type { AuthenticatedEnv } from "../middlewares/require-auth";
+import { requireComputeCredits } from "../middlewares/require-compute-credits";
+import { db } from "@writ/db/client";
+import { resolveModel } from "../lib/model-resolver";
+import buildSystemPrompt from "../lib/system-prompt";
+import type { Prisma } from "@writ/db";
 import { calculateWritConsumedTokens } from "../lib/compute-credits";
 import { ingestTokenUsage } from "../lib/polar";
-import { requireComputeCredits } from "../middlewares/require-compute-credits";
+import { requirePortfolioQuota } from "../middlewares/require-portfolio-quota";
+
+const isProd = process.env["NODE_ENV"] === "production";
+
+type AppUIMessage = UIMessage<
+  AppMessageMetadata,
+  never,
+  InferUITools<ToolContracts>
+>;
 
 const chatReqSchema = z.object({
-  content: z.string(),
+  id: z.string(),
   model: z.enum(SUPPORTED_CHAT_MODEL_IDS),
-  mode: z.enum(Mode),
+  mode: modeSchema,
+  messages: z
+    .array(
+      z.custom<AppUIMessage>((value) => {
+        return (
+          value != null &&
+          typeof value === "object" &&
+          "id" in value &&
+          "parts" in value
+        );
+      }),
+    )
+    .min(1),
 });
 
 const chatReqValidator = zValidator("json", chatReqSchema, (result, c) => {
@@ -43,610 +60,340 @@ const chatReqValidator = zValidator("json", chatReqSchema, (result, c) => {
   }
 });
 
-// Stores IDs of all sessions with regeneration active
-const activeRegenerations = new Set<string>();
+function hasPendingToolCalls(responseMessage: AppUIMessage) {
+  return responseMessage.parts.some((part) => {
+    if (part.type === "dynamic-tool" || part.type.startsWith("tool-")) {
+      const state = (part as { state?: string }).state;
 
-interface HistoryMessage {
-  role: "USER" | "AGENT" | "ERROR";
-  status: MessageStatus;
-  content: string;
-  blocks: Prisma.JsonValue | null;
-}
-
-function buildChatHistory(messages: HistoryMessage[]): ModelMessage[] {
-  return messages.flatMap((msg) => {
-    if (msg.role === "ERROR") return [];
-
-    if (msg.role === "USER") {
-      return [{ role: "user", content: msg.content }];
+      return state !== "output-available" && state !== "output-error";
     }
 
-    if (msg.role === "AGENT") {
-      // Legacy messages with no block data
-      if (!msg.blocks) {
-        if (!msg.content) return [];
-
-        return [{ role: "assistant", content: msg.content }];
-      }
-
-      const parsed = messageContentSchema.safeParse(msg.blocks);
-
-      if (!parsed.success) {
-        if (!msg.content) return [];
-
-        return [{ role: "assistant", content: msg.content }];
-      }
-
-      try {
-        const assistantContent: (TextPart | ToolCallPart)[] = [];
-        const toolContent: ToolResultPart[] = [];
-
-        for (const block of parsed.data) {
-          if (block.type === "text") {
-            assistantContent.push({ type: "text", text: block.text });
-          } else if (block.type === "tool-use") {
-            // Skip tool-call blocks that never received a result
-            // (can happen with interrupted streams)
-            if (block.result === undefined) continue;
-
-            assistantContent.push({
-              type: "tool-call",
-              toolCallId: block.id,
-              toolName: block.name,
-              input: block.input,
-            });
-
-            // Parse the stored JSON string back to its original shape
-            let parsedResult: unknown = block.result;
-
-            try {
-              parsedResult = JSON.parse(block.result);
-            } catch {
-              // If it's not valid JSON, treat it as plain text
-            }
-
-            const wrappedOutput =
-              typeof parsedResult === "string"
-                ? ({ type: "text", value: parsedResult } as const)
-                : ({ type: "json", value: parsedResult as JSONValue } as const);
-
-            toolContent.push({
-              type: "tool-result",
-              toolCallId: block.id,
-              toolName: block.name,
-              output: wrappedOutput,
-            });
-          }
-          // "reasoning" blocks are intentionally omitted from history:
-          // they are display-only and not valid in AssistantContent for
-          // most providers (Groq, Google).
-        }
-
-        const results: ModelMessage[] = [];
-
-        if (assistantContent.length > 0) {
-          results.push({ role: "assistant", content: assistantContent });
-        } else if (msg.content) {
-          // No parseable blocks but we have a text summary — use it
-          results.push({ role: "assistant", content: msg.content });
-        }
-
-        if (toolContent.length > 0) {
-          results.push({ role: "tool", content: toolContent });
-        }
-
-        return results;
-      } catch {
-        // Last-resort fallback: if reconstruction throws for any reason,
-        // include the message as plain text so the session stays usable.
-        if (!msg.content) return [];
-        return [{ role: "assistant", content: msg.content }];
-      }
-    }
-
-    return [];
+    return false;
   });
 }
 
-function pruneHistory(messages: HistoryMessage[], maxChars = 24000) {
+/**
+ * Removes assistant messages from the history that have unresolved tool calls
+ * or are completely empty. These are artefacts of previously failed/aborted
+ * streams that were saved mid-flight. Leaving them in causes
+ * validateUIMessages / convertToModelMessages to throw on the next request.
+ */
+function sanitizeMessages(messages: AppUIMessage[]): AppUIMessage[] {
+  return messages.filter((msg) => {
+    if (msg.role !== "assistant") return true;
+
+    // Drop messages with pending (unresolved) tool calls
+    if (hasPendingToolCalls(msg)) return false;
+
+    // Drop completely empty assistant messages (aborted before any output)
+    const hasContent = msg.parts.some(
+      (p) =>
+        (p.type === "text" && (p as { text: string }).text.trim().length > 0) ||
+        p.type === "reasoning" ||
+        p.type === "dynamic-tool" ||
+        p.type.startsWith("tool-"),
+    );
+
+    return hasContent;
+  });
+}
+
+/**
+ * Ensures the context sent to the LLM doesn't exceed reasonable limits.
+ * Walks backwards to keep the most recent messages, and ensures the
+ * truncated history safely starts on a user message to prevent
+ * orphaning tool-results from their tool-calls.
+ */
+function pruneModelMessages(
+  messages: ModelMessage[],
+  maxChars = 24_000,
+): ModelMessage[] {
   let currentChars = 0;
-  const pruned = [];
+  let startIndex = 0;
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
 
     if (!msg) continue;
-    if (msg.role === "ERROR") continue;
 
-    let charCount = msg.content.length;
+    const contentStr =
+      typeof msg.content === "string"
+        ? msg.content
+        : JSON.stringify(msg.content);
 
-    // If it's an AGENT message with blocks, we must account for the
-    // size of the tool's output, otherwise we'll blow past the context limit
-    if (msg.role === "AGENT" && msg.blocks) {
-      const parsed = messageContentSchema.safeParse(msg.blocks);
-
-      if (parsed.success) {
-        charCount = Math.max(charCount, JSON.stringify(parsed.data).length);
-      }
-    }
-
-    // Skip truly empty messages
-    if (msg.role === "AGENT" && charCount === 0) continue;
-
-    currentChars += charCount;
+    currentChars += contentStr.length;
 
     if (currentChars > maxChars) {
+      // Find the next closest user message to safely start the context
+      for (let j = i + 1; j < messages.length; j++) {
+        const innerMsg = messages[j];
+
+        if (innerMsg && innerMsg.role === "user") {
+          startIndex = j;
+          break;
+        }
+      }
+
+      // Fallback if no user message is found after the cutoff
+      if (startIndex === 0 && i + 1 < messages.length) {
+        startIndex = i + 1;
+      }
+
       break;
     }
-
-    pruned.unshift(msg);
   }
 
-  return pruned;
-}
-
-function getLastUserMessageForRegeneration(
-  messages: {
-    role: "USER" | "AGENT" | "ERROR";
-    model: string;
-    mode: Mode;
-  }[],
-) {
-  const lastMessage = messages[messages.length - 1];
-
-  if (!lastMessage || lastMessage.role !== "USER") return null;
-
-  return lastMessage;
-}
-
-interface IngestMessageCreditsParams {
-  status: "completed" | "interrupted";
-  messageId: string;
-}
-
-interface ChatStreamContext {
-  userId: string;
-  sessionId: string;
-  cwd: string | null;
-  model: SupportedChatModelId;
-  mode: Mode;
-  history: ModelMessage[];
-  abortController: AbortController;
-}
-
-async function streamAIResponse(
-  stream: SSEStreamingApi,
-  context: ChatStreamContext,
-) {
-  const { userId, sessionId, cwd, model, mode, history, abortController } =
-    context;
-  const startedAt = Date.now();
-  const tools = cwd ? createTools(cwd, mode) : undefined;
-  const messageBlocks: MessageBlock[] = [];
-  const resolvedModel = resolveModel(model);
-  let modelUsage: LanguageModelUsage | null = null;
-
-  const saveInterruptedMsg = async () => {
-    if (messageBlocks.length === 0) return;
-
-    const fullText = messageBlocks
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-
-    if (fullText.length === 0) return;
-
-    const validatedBlocks: Prisma.InputJsonValue | undefined =
-      messageBlocks.length > 0
-        ? messageContentSchema.parse(messageBlocks)
-        : undefined;
-    const elapsedMs = Date.now() - startedAt;
-
-    return db.message.create({
-      data: {
-        sessionId,
-        role: "AGENT",
-        status: MessageStatus.INTERRUPTED,
-        model,
-        mode,
-        content: fullText, // save whatever text was generated before abort
-        blocks: validatedBlocks,
-        duration: Math.round(elapsedMs / 1000),
-      },
-    });
-  };
-
-  const ingestMessageCredits = async ({
-    status,
-    messageId,
-  }: IngestMessageCreditsParams) => {
-    if (!modelUsage) return;
-
-    try {
-      const billingMetrics = calculateWritConsumedTokens({
-        provider: resolvedModel.provider,
-        model: resolvedModel.modelId,
-        usage: modelUsage,
-      });
-
-      await ingestTokenUsage({
-        eventId: `chat-message:${messageId}`,
-        externalCustomerId: userId,
-        amount: billingMetrics.consumedTokens,
-        status,
-      });
-    } catch (error) {
-      console.error("Failed to ingest Polar token usage for chat message:", {
-        error,
-        userId,
-        sessionId,
-        messageId,
-      });
-    }
-  };
-
-  const saveInterruptedMsgAndCredits = async () => {
-    const interruptedMsg = await saveInterruptedMsg();
-
-    if (!interruptedMsg) return;
-
-    await ingestMessageCredits({
-      status: "interrupted",
-      messageId: interruptedMsg.id,
-    });
-  };
-
-  try {
-    const result = streamText({
-      providerOptions: resolvedModel.providerOptions,
-      system: buildSystemPrompt({ cwd, mode }),
-      tools,
-      stopWhen: tools ? stepCountIs(50) : undefined,
-      model: resolvedModel.model,
-      messages: history,
-      abortSignal: abortController.signal,
-      onFinish: (event) => {
-        modelUsage = event.totalUsage;
-      },
-    });
-
-    for await (const block of result.fullStream) {
-      if (stream.aborted) break;
-
-      if (block.type === "reasoning-delta") {
-        const lastBlock = messageBlocks[messageBlocks.length - 1];
-
-        if (lastBlock && lastBlock.type === "reasoning") {
-          lastBlock.text += block.text;
-        } else {
-          messageBlocks.push({ type: "reasoning", text: block.text });
-        }
-
-        const reasoningDeltaEvent: AgentStreamEvent = {
-          type: "reasoning-delta",
-          text: block.text,
-        };
-        await stream.writeSSE({
-          event: "reasoning-delta",
-          data: JSON.stringify(reasoningDeltaEvent),
-        });
-      }
-
-      if (block.type === "text-delta") {
-        const lastBlock = messageBlocks[messageBlocks.length - 1];
-
-        if (lastBlock && lastBlock.type === "text") {
-          lastBlock.text += block.text;
-        } else {
-          messageBlocks.push({ type: "text", text: block.text });
-        }
-
-        const textDeltaEvent: AgentStreamEvent = {
-          type: "text-delta",
-          text: block.text,
-        };
-        await stream.writeSSE({
-          event: "text-delta",
-          data: JSON.stringify(textDeltaEvent),
-        });
-      }
-
-      if (block.type === "tool-call") {
-        const toolInput = toolInputSchema.parse(block.input);
-        messageBlocks.push({
-          type: "tool-use",
-          id: block.toolCallId,
-          name: block.toolName,
-          input: toolInput,
-        });
-        const toolCallEvent: AgentStreamEvent = {
-          type: "tool-input",
-          toolCallId: block.toolCallId,
-          toolName: block.toolName,
-          input: toolInput,
-        };
-        await stream.writeSSE({
-          event: "tool-input",
-          data: JSON.stringify(toolCallEvent),
-        });
-      }
-
-      if (block.type === "tool-result") {
-        const storedResult =
-          typeof block.output === "string"
-            ? block.output
-            : JSON.stringify(block.output);
-
-        const toolUseBlock = messageBlocks.find(
-          (b): b is Extract<MessageBlock, { type: "tool-use" }> =>
-            b.type === "tool-use" && b.id === block.toolCallId,
-        );
-
-        if (toolUseBlock) {
-          toolUseBlock.result = storedResult;
-        }
-
-        const toolOutputEvent: AgentStreamEvent = {
-          type: "tool-output",
-          toolCallId: block.toolCallId,
-          result: storedResult,
-        };
-        await stream.writeSSE({
-          event: "tool-output",
-          data: JSON.stringify(toolOutputEvent),
-        });
-      }
-
-      if (block.type === "error") {
-        throw block.error;
-      }
-    }
-
-    // Catch the abort signal and save the partial text to the DB
-    if (stream.aborted || abortController.signal.aborted) {
-      await saveInterruptedMsgAndCredits();
-      return;
-    }
-
-    const fullText = messageBlocks
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-    const validatedBlocks: Prisma.InputJsonValue | undefined =
-      messageBlocks.length > 0
-        ? messageContentSchema.parse(messageBlocks)
-        : undefined;
-    const elapsedMs = Date.now() - startedAt;
-    const agentMessage = await db.message.create({
-      data: {
-        sessionId,
-        role: "AGENT",
-        status: MessageStatus.COMPLETED,
-        model,
-        mode,
-        content: fullText,
-        blocks: validatedBlocks,
-        duration: Math.round(elapsedMs / 1000),
-      },
-    });
-
-    await ingestMessageCredits({
-      status: "completed",
-      messageId: agentMessage.id,
-    });
-
-    const doneEvent: AgentStreamEvent = {
-      type: "done",
-      messageId: agentMessage.id,
-      durationMs: elapsedMs,
-    };
-
-    await stream.writeSSE({ event: "done", data: JSON.stringify(doneEvent) });
-  } catch (error) {
-    console.error("Failed to stream AI response:", error);
-
-    if (abortController.signal.aborted) {
-      await saveInterruptedMsgAndCredits();
-      return;
-    }
-
-    const errMsg =
-      error instanceof Error
-        ? error.message
-        : typeof error === "object" && error !== null
-          ? JSON.stringify(error)
-          : String(error);
-    await db.message.create({
-      data: {
-        sessionId,
-        role: "ERROR",
-        status: MessageStatus.COMPLETED,
-        model,
-        mode,
-        content: errMsg,
-      },
-    });
-
-    const errorEvent: AgentStreamEvent = { type: "error", message: errMsg };
-    await stream.writeSSE({ event: "error", data: JSON.stringify(errorEvent) });
-  }
+  return messages.slice(startIndex);
 }
 
 const chatRouter = new Hono<AuthenticatedEnv>()
-  .post("/", requireComputeCredits, chatReqValidator, async (c) => {
-    const sessionId = c.req.param("sessionId");
+  .post(
+    "/",
+    requirePortfolioQuota,
+    requireComputeCredits,
+    chatReqValidator,
+    async (c) => {
+      const sessionId = c.req.param("sessionId");
 
-    if (!sessionId) {
-      return c.json({ error: "Missing session ID" }, 400);
-    }
+      if (!sessionId) {
+        return c.json({ error: "Missing session ID" }, 400);
+      }
 
-    const userId = c.get("userId");
+      const userId = c.get("userId");
 
-    const session = await db.session.findUnique({
-      where: { userId, id: sessionId },
-      include: { messages: { orderBy: { createdAt: "asc" } } },
-    });
+      const session = await db.session.findUnique({
+        where: { userId, id: sessionId },
+      });
 
-    if (!session) {
-      return c.json({ error: "Session not found" }, 404);
-    }
+      if (!session) {
+        return c.json({ error: "Session not found" }, 404);
+      }
 
-    const data = c.req.valid("json");
-    await db.message.create({
-      data: {
-        sessionId,
-        role: "USER",
-        status: MessageStatus.COMPLETED,
-        model: data.model,
-        mode: data.mode,
-        content: data.content,
-      },
-    });
+      const {
+        model,
+        mode,
+        messages: incomingClientMessages,
+      } = c.req.valid("json");
+      const startedAt = Date.now();
+      const toolContracts = getToolContracts(mode);
+      const resolvedModel = resolveModel(model);
 
-    const recentMessages = pruneHistory(session.messages);
-    const history = buildChatHistory([
-      ...recentMessages,
-      // Append the new user message:
-      {
-        role: "USER" as const,
-        blocks: null,
-        content: data.content,
-        status: MessageStatus.COMPLETED,
-      },
-    ]);
+      const persistedMessages = Array.isArray(session.messages)
+        ? (session.messages as unknown as AppUIMessage[])
+        : [];
 
-    const abortController = new AbortController();
+      // Merge incoming messages with DB history
+      const mergedMessages = [...persistedMessages];
 
-    return streamSSE(
-      c,
-      async (stream) => {
-        stream.onAbort(() => {
-          abortController.abort();
+      for (const message of incomingClientMessages) {
+        const incomingMessage = {
+          ...message,
+          metadata: { ...message.metadata, model, mode },
+        } satisfies AppUIMessage;
+
+        const persistedMessageIndex = mergedMessages.findIndex(
+          (m) => m.id === incomingMessage.id,
+        );
+
+        if (persistedMessageIndex === -1) {
+          mergedMessages.push(incomingMessage);
+        } else {
+          mergedMessages[persistedMessageIndex] = incomingMessage;
+        }
+      }
+
+      let validatedUIMessages: AppUIMessage[];
+
+      try {
+        validatedUIMessages = await validateUIMessages<AppUIMessage>({
+          messages: sanitizeMessages(mergedMessages),
+          tools: toolContracts,
         });
+      } catch (validationError) {
+        console.error("[chat] validateUIMessages failed:", validationError);
+        return c.json(
+          {
+            error:
+              "Message history could not be validated. Please start a new session if this keeps happening.",
+          },
+          422,
+        );
+      }
 
-        await streamAIResponse(stream, {
-          userId,
-          sessionId,
-          cwd: session.cwd,
-          model: data.model,
-          history,
-          mode: data.mode,
-          abortController,
-        });
-      },
-      async (error, stream) => {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        const errorEvent: AgentStreamEvent = { type: "error", message: errMsg };
-        await stream.writeSSE({
-          event: "error",
-          data: JSON.stringify(errorEvent),
-        });
-      },
-    );
-  })
-  .post("/regenerate", requireComputeCredits, async (c) => {
-    const sessionId = c.req.param("sessionId");
-
-    if (!sessionId) {
-      return c.json({ error: "Missing session ID" }, 400);
-    }
-
-    const userId = c.get("userId");
-
-    const session = await db.session.findUnique({
-      where: { userId, id: sessionId },
-      include: { messages: { orderBy: { createdAt: "asc" } } },
-    });
-
-    if (!session) {
-      return c.json({ error: "Session not found" }, 404);
-    }
-
-    // Check if the last message is the AI's response (or a failed response)
-    // If it is, we delete it to make room for the new regeneration
-    const lastMsg = session.messages[session.messages.length - 1];
-
-    if (lastMsg && (lastMsg.role === "AGENT" || lastMsg.role === "ERROR")) {
-      await db.message.delete({ where: { id: lastMsg.id } });
-
-      // Remove it from the in-memory array so the rest of the code
-      // (like buildChatHistory) doesn't use it
-      session.messages.pop();
-    }
-
-    const regeneratableMessage = getLastUserMessageForRegeneration(
-      session.messages,
-    );
-
-    if (!regeneratableMessage) {
-      return c.json(
-        { error: "Session has no pending user message for regeneration" },
-        409,
-      );
-    }
-
-    if (!isChatModelSupported(regeneratableMessage.model)) {
-      return c.json(
+      const rawModelMessages = await convertToModelMessages(
+        validatedUIMessages,
         {
-          error: `Session uses an unsupported model: ${regeneratableMessage.model}`,
+          tools: toolContracts,
         },
-        409,
       );
-    }
 
-    if (activeRegenerations.has(sessionId)) {
-      return c.json(
-        { error: "Session already has an active regenaration" },
-        409,
-      );
-    }
+      const prunedModelMessages = pruneModelMessages(rawModelMessages);
 
-    activeRegenerations.add(sessionId);
+      let modelUsage: LanguageModelUsage | null = null;
 
-    const recentMessages = pruneHistory(session.messages);
-    const history = buildChatHistory(recentMessages);
-    const abortController = new AbortController();
+      const result = streamText({
+        model: resolvedModel.model,
+        system: buildSystemPrompt(mode),
+        messages: prunedModelMessages,
+        tools: toolContracts,
+        providerOptions: resolvedModel.providerOptions,
+        // Wire the HTTP request's AbortSignal so streamText knows when the
+        // client disconnects. Without this, event.isAborted is always false,
+        // meaning the interrupted flag is never stamped on the DB message
+        abortSignal: c.req.raw.signal,
+        onFinish: (event) => {
+          modelUsage = event.totalUsage;
+        },
+        onError: ({ error }) => {
+          const streamError =
+            error instanceof Error ? error : new Error(String(error));
+          console.error(
+            "[chat] streamText onError:",
+            streamError.message,
+            streamError.stack,
+          );
+        },
+      });
 
-    try {
-      return streamSSE(
-        c,
-        async (stream) => {
-          stream.onAbort(() => {
-            abortController.abort();
+      return result.toUIMessageStreamResponse<AppUIMessage>({
+        consumeSseStream: consumeStream,
+        originalMessages: validatedUIMessages,
+        messageMetadata: ({ part }) => {
+          if (part.type === "start") return { model, mode };
+          if (part.type !== "finish") return undefined;
+
+          const isStreamAborted = c.req.raw.signal.aborted;
+
+          return {
+            model,
+            mode,
+            durationMs: Date.now() - startedAt,
+            ...(modelUsage ? { modelUsage } : {}),
+            ...(isStreamAborted ? { isInterrupted: true } : {}),
+          };
+        },
+        onFinish: async (event) => {
+          const isStreamAborted = event.isAborted || c.req.raw.signal.aborted;
+
+          if (!isStreamAborted && hasPendingToolCalls(event.responseMessage)) {
+            return;
+          }
+
+          // On abort, stamp isInterrupted onto the response message so the UI
+          // label persists after the user reloads the session from DB
+          const msgsToSave = isStreamAborted
+            ? event.messages.map((msg, index) =>
+                index === event.messages.length - 1
+                  ? {
+                      ...msg,
+                      metadata: {
+                        ...(msg as AppUIMessage).metadata,
+                        isInterrupted: true,
+                      },
+                    }
+                  : msg,
+              )
+            : event.messages;
+
+          await db.session.update({
+            where: { id: sessionId, userId },
+            data: {
+              messages: msgsToSave as unknown as Prisma.InputJsonValue,
+            },
           });
+
+          if (isProd) {
+            await db.userQuota.upsert({
+              where: { userId },
+              create: { userId, messageCount: 1 },
+              update: { messageCount: { increment: 1 } },
+            });
+          }
+
+          if (!modelUsage) return;
 
           try {
-            await streamAIResponse(stream, {
-              userId,
-              sessionId,
-              cwd: session.cwd,
-              model: regeneratableMessage.model as SupportedChatModelId,
-              mode: regeneratableMessage.mode,
-              history,
-              abortController,
+            const billingMetrics = calculateWritConsumedTokens({
+              provider: resolvedModel.provider,
+              model: resolvedModel.modelId,
+              usage: modelUsage,
             });
-          } finally {
-            activeRegenerations.delete(sessionId);
+
+            await ingestTokenUsage({
+              eventId: `chat-message:${event.responseMessage.id}`,
+              externalCustomerId: userId,
+              amount: billingMetrics.consumedTokens,
+              status: isStreamAborted ? "interrupted" : "completed",
+            });
+          } catch (error) {
+            console.error(
+              "Failed to ingest Polar token usage for chat message:",
+              { error, userId, sessionId, messageId: event.responseMessage.id },
+            );
           }
         },
-        async (error, stream) => {
-          activeRegenerations.delete(sessionId);
-          const errMsg = error instanceof Error ? error.message : String(error);
-          const errorEvent: AgentStreamEvent = {
-            type: "error",
-            message: errMsg,
-          };
-          await stream.writeSSE({
-            event: "error",
-            data: JSON.stringify(errorEvent),
-          });
-        },
-      );
-    } catch (error) {
-      activeRegenerations.delete(sessionId);
+        onError: (error) => {
+          const raw =
+            error instanceof Error
+              ? error.message
+              : typeof error === "string"
+                ? error
+                : JSON.stringify(error);
 
-      throw error;
+          try {
+            const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+            if (typeof parsed["error"] === "string") return parsed["error"];
+
+            if (
+              typeof parsed["error"] === "object" &&
+              parsed["error"] !== null
+            ) {
+              const nested = parsed["error"] as Record<string, unknown>;
+
+              if (typeof nested["message"] === "string")
+                return nested["message"];
+            }
+
+            if (typeof parsed["message"] === "string") return parsed["message"];
+          } catch {
+            // raw was not JSON — return as-is
+          }
+
+          return raw;
+        },
+      });
+    },
+  )
+  .post("/regenerate", async (c) => {
+    const sessionId = c.req.param("sessionId");
+
+    if (!sessionId) return c.json({ error: "Missing session ID" }, 400);
+
+    const userId = c.get("userId");
+    const session = await db.session.findUnique({
+      where: { userId, id: sessionId },
+    });
+
+    if (!session) return c.json({ error: "Session not found" }, 404);
+
+    const messages = Array.isArray(session.messages)
+      ? (session.messages as unknown as AppUIMessage[])
+      : [];
+
+    const lastMsg = messages[messages.length - 1];
+
+    // Only drop the message if the absolute last message is an assistant response.
+    if (lastMsg && lastMsg.role === "assistant") {
+      const cleaned = messages.slice(0, -1);
+
+      await db.session.update({
+        where: { id: sessionId, userId },
+        data: { messages: cleaned as unknown as Prisma.InputJsonValue },
+      });
     }
+
+    return c.json({ ok: true });
   });
 
 export default chatRouter;

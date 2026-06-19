@@ -6,7 +6,7 @@ function getEnvVar(name: string) {
   const value = process.env[name];
 
   if (!value) {
-    throw new Error(`[Polar] ${name} is missing in the environment`);
+    throw new Error(`[polar] ${name} is missing in the environment`);
   }
 
   return value;
@@ -153,10 +153,7 @@ export async function ingestTokenUsage({
         name: "consumed_tokens",
         externalId: eventId,
         externalCustomerId,
-        metadata: {
-          amount,
-          status,
-        },
+        metadata: { amount, status },
       },
     ],
   });

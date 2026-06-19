@@ -15,10 +15,52 @@ import {
   type Theme,
   type ThemePreferences,
 } from "./themes";
-import type { UIMessageToolUseBlock } from "../hooks/use-chat";
 import { SUPPORTED_CHAT_MODELS, type SupportedChatModelId } from "@writ/shared";
 import { isAbsolute, relative, resolve } from "node:path";
 import { readdir } from "node:fs/promises";
+import type {
+  ToolUseBlock,
+  UIMessageBlock,
+} from "../components/chat-messages/agent-response";
+import { PortfolioQuotaError } from "../hooks/use-app-chat";
+
+export interface ActiveCommandContext {
+  query: string; // text after the "/"
+  startIndex: number; // absolute index of the "/"
+  endIndex: number; // end of the token
+}
+
+export function findActiveCommand(
+  text: string,
+  cursorOffset: number,
+): ActiveCommandContext | null {
+  const safeOffset = Math.max(0, Math.min(cursorOffset, text.length));
+
+  // Isolate the word the cursor is currently touching
+  let start = safeOffset,
+    end = safeOffset;
+
+  while (start > 0 && !/\s/.test(text[start - 1]!)) start--;
+
+  while (end < text.length && !/\s/.test(text[end]!)) end++;
+
+  const token = text.slice(start, end);
+  const relativeCursor = safeOffset - start;
+
+  // The "/" must be the very first character of the word.
+  // If it's anywhere else (e.g. "src/components"), it's a path — ignore it.
+  if (token[0] !== "/") return null;
+
+  // Cursor must be positioned after the "/"
+  if (relativeCursor <= 0) return null;
+
+  const query = token.slice(1);
+
+  // A second "/" means it's a path fragment, not a command
+  if (query.includes("/")) return null;
+
+  return { query, startIndex: start, endIndex: end };
+}
 
 export function getFilteredCmdItems(
   items: CommandMenuItem[],
@@ -91,16 +133,6 @@ export async function getErrorMessage(response: CustomErrorResponse) {
   }
 }
 
-/**
- * Formats a tool name from camelCase/kebab-case/snake_case to Title Case with spaces.
- *
- * @example
- * formatToolName("readFile")      // "Read File"
- * formatToolName("grep")          // "Grep"
- * formatToolName("edit_file")     // "Edit File"
- * formatToolName("list-directory")// "List Directory"
- * formatToolName("runCommand")    // "Run Command"
- */
 export function formatToolName(name: string): string {
   // Split on capital letters, underscores, or hyphens
   const words = name
@@ -115,33 +147,46 @@ export function formatToolName(name: string): string {
     .join(" ");
 }
 
-// Example output: path: "/src/index.ts"  •  encoding: "utf-8"
-export function formatToolArguments(
-  toolUseBlock: UIMessageToolUseBlock,
-): string {
-  const entries = Object.entries(toolUseBlock.input);
+export function isToolUseBlock(block: UIMessageBlock): block is ToolUseBlock {
+  return block.type === "dynamic-tool" || block.type.startsWith("tool-");
+}
 
-  if (entries.length === 0) return "No arguments";
+export function formatToolArguments(toolUseBlock: ToolUseBlock): string {
+  if (!("input" in toolUseBlock) || toolUseBlock.input === null) {
+    return "";
+  }
+
+  if (typeof toolUseBlock.input !== "object") return String(toolUseBlock.input);
+
+  const entries = Object.entries(toolUseBlock.input as Record<string, unknown>);
+
+  if (entries.length === 0) return "";
 
   return entries
     .map(([key, value]) => {
       const isString = typeof value === "string";
-      let stringified = JSON.stringify(value);
+      const raw = isString ? (value as string) : JSON.stringify(value);
+      // Collapse newlines and truncate long values for single-line TUI display
+      const cleaned = raw.replace(/\r?\n|\r/g, " ↵ ");
+      const display =
+        cleaned.length > 40 ? `${cleaned.slice(0, 37)}...` : cleaned;
 
-      if (stringified && stringified.length > 50) {
-        if (isString) {
-          const rawString = value as string;
-          const cleaned = rawString.replace(/\r?\n/g, " ↵ ");
-          const truncated = `${cleaned.slice(0, 45)}...`;
-          stringified = `"${truncated}"`;
-        } else {
-          stringified = `${stringified.slice(0, 47)}...`;
-        }
-      }
-
-      return `${key}: ${stringified}`;
+      return `${key}: ${display}`;
     })
     .join("  •  ");
+}
+
+export function extractErrorMessage(error: Error): string {
+  try {
+    const parsed = JSON.parse(error.message) as Record<string, unknown>;
+
+    if (typeof parsed["error"] === "string") return parsed["error"];
+    if (typeof parsed["message"] === "string") return parsed["message"];
+  } catch {
+    // Not JSON — return message as-is
+  }
+
+  return error.message;
 }
 
 export function getModelLabel(modelId: SupportedChatModelId): string {
@@ -345,4 +390,27 @@ export async function getMentionCandidates(
 
     return [];
   }
+}
+
+export function resolveSafeProjectPath(targetPath: string) {
+  if (!isWithinCWD(targetPath)) {
+    throw new Error("Path is outside the project directory");
+  }
+
+  const resolvedPath = isAbsolute(targetPath)
+    ? targetPath
+    : resolve(CWD, targetPath);
+  const relativePath = relative(CWD, resolvedPath) || ".";
+
+  return {
+    cwd: CWD,
+    resolvedPath,
+    relativePath,
+  };
+}
+
+export function isPortfolioQuotaError(err: Error): err is PortfolioQuotaError {
+  return (
+    err instanceof PortfolioQuotaError || err.name === "PortfolioQuotaError"
+  );
 }
