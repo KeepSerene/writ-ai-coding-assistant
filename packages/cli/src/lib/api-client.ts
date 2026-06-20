@@ -2,13 +2,10 @@ import { hc } from "hono/client";
 import type { AppType } from "@writ/server";
 import { clearAuthToken, getAuthToken } from "./auth-token-store";
 
-const apiBaseUrl = process.env["API_BASE_URL"];
+const apiBaseUrl =
+  process.env["API_BASE_URL"] ?? "https://writ-server-k1sb.onrender.com";
 
-if (!apiBaseUrl) {
-  throw new Error("API_BASE_URL is missing in the environment");
-}
-
-const apiClient = hc<AppType>(apiBaseUrl!, {
+const apiClient = hc<AppType>(apiBaseUrl, {
   fetch: async (
     input: Parameters<typeof fetch>[0],
     init?: Parameters<typeof fetch>[1],

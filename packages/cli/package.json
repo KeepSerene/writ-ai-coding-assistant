@@ -1,19 +1,24 @@
 {
-  "name": "@writ/cli",
+  "name": "@keepserene/writ",
+  "version": "1.0.0",
   "module": "src/index.tsx",
   "type": "module",
-  "private": true,
+  "description": "A terminal-based, agentic AI coding assistant.",
+  "license": "Apache-2.0",
+  "homepage": "https://math-to-dev.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KeepSerene/writ-ai-coding-assistant"
+  },
   "author": "Dhrubajyoti Bhattacharjee",
   "scripts": {
-    "dev": "bun run --env-file=../../.env --watch src/index.tsx"
+    "dev": "bun run --env-file=../../.env --watch src/index.tsx",
+    "build": "bun run scripts/build.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/react": "^19.2.15",
     "@writ/server": "workspace:*"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   },
   "dependencies": {
     "@ai-sdk/react": "3.0.199",

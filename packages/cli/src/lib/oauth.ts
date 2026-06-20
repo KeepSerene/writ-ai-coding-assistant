@@ -26,21 +26,13 @@ import { createServer } from "node:http";
 import open from "open";
 import { saveAuthToken } from "./auth-token-store";
 
-const clerkApiBaseUrl = process.env["CLERK_API_CLIENT_BASE_URL"];
-const clerkOAuthClientId = process.env["CLERK_OAUTH_CLIENT_ID"];
-const serverApiBaseUrl = process.env["API_BASE_URL"];
-
-if (!clerkApiBaseUrl) {
-  throw new Error("CLERK_API_CLIENT_BASE_URL is not set in the environment");
-}
-
-if (!clerkOAuthClientId) {
-  throw new Error("CLERK_OAUTH_CLIENT_ID is not set in the environment");
-}
-
-if (!serverApiBaseUrl) {
-  throw new Error("API_BASE_URL is not set in the environment");
-}
+const clerkApiBaseUrl =
+  process.env["CLERK_API_CLIENT_BASE_URL"] ??
+  "https://crucial-lemur-72.clerk.accounts.dev";
+const clerkOAuthClientId =
+  process.env["CLERK_OAUTH_CLIENT_ID"] ?? "54hmCQJIeWcsdOHx";
+const serverApiBaseUrl =
+  process.env["API_BASE_URL"] ?? "https://writ-server-k1sb.onrender.com";
 
 /**
  * Payload we embed in the OAuth `state` parameter.

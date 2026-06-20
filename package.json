@@ -5,7 +5,7 @@
   "private": true,
   "description": "An OpenCode clone",
   "scripts": {
-    "dev:cli": "pnpm --filter @writ/cli dev",
+    "dev:cli": "pnpm --filter @keepserene/writ dev",
     "dev:server": "pnpm --filter @writ/server dev",
     "db:reset": "pnpm --filter @writ/db db:reset",
     "db:generate": "pnpm --filter @writ/db db:generate",
