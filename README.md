@@ -344,6 +344,7 @@ The CLI is published as a standalone, self-contained bundle (workspace-only depe
 cd packages/cli
 bun run build
 cd dist
+npm publish --access public --dry-run
 npm publish --access public
 ```
 
