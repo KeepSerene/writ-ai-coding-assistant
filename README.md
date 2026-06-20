@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
+  <a href="https://pnpm.io/"><img src="https://img.shields.io/badge/pnpm-v11.4.0-f69220?logo=pnpm&logoColor=white" alt="pnpm version" /></a>
   <a href="https://www.npmjs.com/package/@keepserene/writ"><img src="https://img.shields.io/npm/v/@keepserene/writ?color=cb3837&logo=npm&logoColor=white" alt="npm version" /></a>
   <a href="https://github.com/KeepSerene/writ-ai-coding-assistant/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/status-work%20in%20progress-yellow" alt="Status" /></a>
 </p>
 
 <p align="center">
