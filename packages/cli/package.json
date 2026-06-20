@@ -1,6 +1,6 @@
 {
   "name": "@keepserene/writ",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "module": "src/index.tsx",
   "type": "module",
   "description": "A terminal-based, agentic AI coding assistant.",

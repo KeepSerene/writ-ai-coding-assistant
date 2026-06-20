@@ -135,8 +135,6 @@ function SessionChat({ session, initialPrompt }: SessionChatParams) {
 
     if (!prompt) return;
 
-    let shouldIgnore = false;
-
     void (async () => {
       try {
         const res = await apiClient.sessions[":id"].title.$post({
@@ -144,7 +142,7 @@ function SessionChat({ session, initialPrompt }: SessionChatParams) {
           json: { prompt },
         });
 
-        if (shouldIgnore || !res.ok) return;
+        if (!res.ok) return;
 
         const data = await res.json();
 
@@ -153,10 +151,6 @@ function SessionChat({ session, initialPrompt }: SessionChatParams) {
         console.error("Failed to fetch title:", error);
       }
     })();
-
-    return () => {
-      shouldIgnore = true;
-    };
   }, [messages, isNewSession, session.id]);
 
   // Stop pending agent stream chunks ONLY when user leaves the session (on true unmount)

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./packages/assets/favicon.svg" alt="Writ logo" width="96" height="96" />
+  <img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/logo.webp" alt="Writ logo" width="96" height="96" />
 </p>
 
 <h1 align="center">Writ</h1>

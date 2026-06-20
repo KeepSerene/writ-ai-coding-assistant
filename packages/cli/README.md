@@ -24,7 +24,7 @@ bunx @keepserene/writ
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/session.png" alt="Writ CLI demo" width="700" />
+  <img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/home.png" alt="Writ CLI home" width="700" />
 </p>
 
 ---
