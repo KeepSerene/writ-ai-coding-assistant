@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./packages/assets/logo.webp" alt="Writ logo" width="96" height="96" />
+  <img src="./packages/assets/favicon.svg" alt="Writ logo" width="96" height="96" />
 </p>
 
 <h1 align="center">Writ</h1>
@@ -9,11 +9,18 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License" /></a>
-  <a href="#"><img src="https://img.shields.io/npm/v/@keepserene/writ?label=npm" alt="npm version" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/runtime-Bun-black?logo=bun" alt="Bun runtime" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/server-Hono-orange" alt="Hono server" /></a>
+  <a href="https://www.npmjs.com/package/@keepserene/writ"><img src="https://img.shields.io/npm/v/@keepserene/writ?color=cb3837&logo=npm&logoColor=white" alt="npm version" /></a>
+  <a href="https://github.com/KeepSerene/writ-ai-coding-assistant/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License" /></a>
   <a href="#"><img src="https://img.shields.io/badge/status-work%20in%20progress-yellow" alt="Status" /></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white" alt="Bun" />
+  <img src="https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/Hono-E36002?logo=hono&logoColor=white" alt="Hono" />
+  <img src="https://img.shields.io/badge/Prisma-2D3748?logo=prisma&logoColor=white" alt="Prisma" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" alt="Neon Postgres" />
 </p>
 
 <p align="center">
@@ -72,20 +79,15 @@ The CLI never talks to LLM providers directly — every request is authenticated
 
 ## Demo
 
-<!-- TODO: Replace with an actual recording before publishing -->
-<p align="center">
-  <img src="./docs/assets/demo.gif" alt="Writ CLI demo" width="800" />
-</p>
-
-<!-- TODO: Add a few more screenshots — model picker, theme switcher, build-mode tool calls, etc. -->
 <table>
   <tr>
-    <td align="center"><img src="./docs/assets/screenshot-home.png" width="380" alt="Home screen" /><br/><sub>Home screen</sub></td>
-    <td align="center"><img src="./docs/assets/screenshot-session.png" width="380" alt="Active session" /><br/><sub>Active session with tool calls</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/home.png" width="380" alt="Home screen" /><br/><sub>Home screen</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/session.png" width="380" alt="Active session" /><br/><sub>Active session with tool calls</sub></td>
   </tr>
+
   <tr>
-    <td align="center"><img src="./docs/assets/screenshot-models.png" width="380" alt="Model picker" /><br/><sub>Model picker</sub></td>
-    <td align="center"><img src="./docs/assets/screenshot-themes.png" width="380" alt="Theme switcher" /><br/><sub>Theme switcher</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/models.png" width="380" alt="Model picker" /><br/><sub>Model picker</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/themes.png" width="380" alt="Theme switcher" /><br/><sub>Theme switcher</sub></td>
   </tr>
 </table>
 
@@ -197,7 +199,7 @@ bunx @keepserene/writ
 **Prerequisites**
 
 - [pnpm](https://pnpm.io/installation) v11+ — package manager for the whole monorepo
-- [Bun](https://bun.sh) — runtime for the CLI package only
+- [Bun](https://bun.sh) v1.3.14+ — runtime for the CLI package only
 - Node.js 24+ — runtime for the server package (matches the `tsup` build target)
 - A [Neon](https://neon.tech) Postgres database (or any Postgres instance)
 - API keys for whichever LLM providers you want to use, plus Clerk and Polar.sh accounts (see [Environment Variables](#environment-variables))
@@ -206,7 +208,7 @@ bunx @keepserene/writ
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/keepserene/writ.git
+git clone https://github.com/KeepSerene/writ-ai-coding-assistant.git
 cd writ
 
 # 2. Install dependencies

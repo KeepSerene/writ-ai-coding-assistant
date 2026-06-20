@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { db } from "@writ/db/client";
 import { generateText } from "ai";
+import { DEFAULT_CHAT_MODEL_ID } from "@writ/shared";
 import type { AuthenticatedEnv } from "../middlewares/require-auth";
 import { requireComputeCredits } from "../middlewares/require-compute-credits";
 import { resolveModel } from "../lib/model-resolver";
@@ -31,6 +32,11 @@ const titleValidator = zValidator("json", titleSchema, (result, c) => {
     return c.json({ error: "prompt is required" }, 400);
   }
 });
+
+const TITLE_GENERATION_MODELS = [
+  "gemini-3.1-flash-lite",
+  DEFAULT_CHAT_MODEL_ID, // fallback
+] as const;
 
 const sessionsRouter = new Hono<AuthenticatedEnv>()
   .get("/", async (c) => {
@@ -105,22 +111,30 @@ const sessionsRouter = new Hono<AuthenticatedEnv>()
       return safe.length < prompt.length ? `${safe}...` : safe;
     };
 
-    let title: string;
+    const titlePrompt = `Generate a concise title (3-6 words) for a coding assistant session based on this user request:\n\n"${prompt}"\n\nRules: Return only the title. No quotes. No trailing punctuation. Capitalize like a title.`;
 
-    try {
-      const { text } = await generateText({
-        model: resolveModel("gemini-3.1-flash-lite").model,
-        prompt: `Generate a concise title (3-6 words) for a coding assistant session based on this user request:\n\n"${prompt}"\n\nRules: Return only the title. No quotes. No trailing punctuation. Capitalize like a title.`,
-        maxOutputTokens: 25,
-      });
+    let title: string | undefined;
 
-      title = text.trim().slice(0, 60);
-    } catch (error) {
+    for (const modelId of TITLE_GENERATION_MODELS) {
+      try {
+        const { text } = await generateText({
+          model: resolveModel(modelId).model,
+          prompt: titlePrompt,
+          maxOutputTokens: 25,
+        });
+
+        title = text.trim().slice(0, 60);
+        break;
+      } catch (error) {
+        console.warn(
+          `[sessions] Title generation failed with model "${modelId}":`,
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+
+    if (!title) {
       title = buildFallbackTitle();
-      console.warn(
-        "[sessions] Title generation failed, using fallback:",
-        error instanceof Error ? error.message : String(error),
-      );
     }
 
     await db.session.update({ where: { id, userId }, data: { title } });

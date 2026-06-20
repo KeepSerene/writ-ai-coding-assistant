@@ -31,14 +31,16 @@ const publishManifest = {
   name: pkg.name,
   version: pkg.version,
   description: pkg.description,
+  keywords: pkg.keywords,
   license: pkg.license,
   author: pkg.author,
   homepage: pkg.homepage,
   repository: pkg.repository,
   type: "module",
-  bin: { writ: "./index.js" },
+  bin: {
+    writ: "./index.js",
+  },
   engines: { bun: ">=1.3.14" },
-  os: ["darwin", "linux"],
   dependencies: Object.fromEntries(
     realDependencies.map((name) => [
       name,

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://your-app.onrender.com/logo.webp" alt="Writ logo" width="80" height="80" />
+  <img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/logo.webp" alt="Writ logo" width="80" height="80" />
 </p>
 
 <h1 align="center">writ</h1>
@@ -9,18 +9,22 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@keepserene/writ"><img src="https://img.shields.io/npm/v/@keepserene/writ?label=npm" alt="npm version" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License" /></a>
-  <a href="https://bun.sh"><img src="https://img.shields.io/badge/requires-Bun-black?logo=bun" alt="Requires Bun" /></a>
+  <a href="https://www.npmjs.com/package/@keepserene/writ"><img src="https://img.shields.io/npm/v/@keepserene/writ?color=cb3837&logo=npm&logoColor=white" alt="npm version" /></a>
+  <a href="https://github.com/KeepSerene/writ-ai-coding-assistant/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a>
+  <a href="https://bun.sh"><img src="https://img.shields.io/badge/requires-Bun-000000?logo=bun&logoColor=white" alt="Requires Bun" /></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black" alt="React" />
 </p>
 
 ```bash
 bunx @keepserene/writ
 ```
 
-<!-- TODO: Replace with an actual recording before publishing -->
 <p align="center">
-  <img src="https://raw.githubusercontent.com/keepserene/writ/main/docs/assets/demo.gif" alt="Writ CLI demo" width="700" />
+  <img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/session.png" alt="Writ CLI demo" width="700" />
 </p>
 
 ---
@@ -29,15 +33,25 @@ bunx @keepserene/writ
 
 `writ` is the terminal client for **Writ**, a full-stack AI coding assistant in the spirit of OpenCode and Claude Code. It runs entirely in your terminal, reads and edits files in whatever directory you launch it from, and streams responses from your choice of LLM provider through a small managed backend — no API keys required to try it.
 
-This package is the CLI half only. It's a thin, React-powered terminal UI; all inference, auth, and billing happen server-side. See the [full project README](https://github.com/keepserene/writ) for the complete architecture, including the Hono/Prisma server this talks to.
+This package is the CLI half only. It's a thin, React-powered terminal UI; all inference, auth, and billing happen server-side. See the [full project README](https://github.com/KeepSerene/writ-ai-coding-assistant) for the complete architecture, including the Hono/Prisma server this talks to.
 
 ## Requirements
 
-- [Bun](https://bun.sh) — the only runtime dependency. If you don't have it:
-  ```bash
-  curl -fsSL https://bun.sh/install | bash
-  ```
-- macOS or Linux (including WSL). Native Windows isn't currently supported.
+- [Bun](https://bun.sh) v1.3.14 or later — the only runtime dependency.
+  - macOS / Linux:
+
+```bash
+    curl -fsSL https://bun.sh/install | bash
+```
+
+- Windows (PowerShell):
+
+```powershell
+    powershell -c "irm bun.sh/install.ps1 | iex"
+```
+
+- Already have Bun? Update with `bun upgrade`.
+- Works on Windows, macOS, and Linux.
 
 ## Quick Start
 
@@ -107,7 +121,7 @@ Type `@` followed by a path fragment to reference a file or folder — e.g. `@sr
 
 ## Configuration
 
-`writ` works out of the box with zero configuration — it ships with public, non-secret defaults pointing at the hosted demo server. If you're self-hosting your own [Writ server](https://github.com/keepserene/writ), point the CLI at it with environment variables:
+`writ` works out of the box with zero configuration — it ships with public, non-secret defaults pointing at the hosted demo server. If you're self-hosting your own [Writ server](https://github.com/KeepSerene/writ-ai-coding-assistant), point the CLI at it with environment variables:
 
 ```bash
 API_BASE_URL="https://your-server.example.com" \
@@ -120,24 +134,24 @@ None of these are secrets — `writ` is a public OAuth client (PKCE), so there's
 
 ## Demo Limits
 
-The hosted demo server enforces a rolling **7-day quota of 3 messages per account** to keep a free-tier deployment sane — this is a portfolio project, not a hosted product. If you hit it, the CLI will tell you when it resets. For unlimited use, [self-host the server](https://github.com/keepserene/writ#deployment) with your own LLM provider keys and point this CLI at it as shown above.
+The hosted demo server enforces a rolling **7-day quota of 3 messages per account** to keep a free-tier deployment sane — this is a portfolio project, not a hosted product. If you hit it, the CLI will tell you when it resets. For unlimited use, [self-host the server](https://github.com/KeepSerene/writ-ai-coding-assistant#deployment) with your own LLM provider keys and point this CLI at it as shown above.
 
 ## Building From Source
 
 This package is published from a monorepo. To build or modify it yourself:
 
 ```bash
-git clone https://github.com/keepserene/writ.git
-cd writ
+git clone https://github.com/KeepSerene/writ-ai-coding-assistant.git
+cd writ-ai-coding-assistant
 pnpm install
 pnpm dev:cli
 ```
 
-See the [main repository](https://github.com/keepserene/writ) for full setup instructions, including the server and database.
+See the [main repository](https://github.com/KeepSerene/writ-ai-coding-assistant) for full setup instructions, including the server and database.
 
 ## License
 
-Apache-2.0 — see [LICENSE](https://github.com/keepserene/writ/blob/main/LICENSE).
+Apache-2.0 — see [LICENSE](https://github.com/KeepSerene/writ-ai-coding-assistant/blob/main/LICENSE).
 
 ## Author
 
@@ -146,5 +160,5 @@ Apache-2.0 — see [LICENSE](https://github.com/keepserene/writ/blob/main/LICENS
 
 ## Links
 
-- [Source code](https://github.com/keepserene/writ)
-- [Report an issue](https://github.com/keepserene/writ/issues)
+- [Source code](https://github.com/KeepSerene/writ-ai-coding-assistant)
+- [Report an issue](https://github.com/KeepSerene/writ-ai-coding-assistant/issues)

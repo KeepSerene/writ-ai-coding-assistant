@@ -1,9 +1,18 @@
 {
   "name": "@keepserene/writ",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "module": "src/index.tsx",
   "type": "module",
   "description": "A terminal-based, agentic AI coding assistant.",
+  "keywords": [
+    "ai",
+    "cli",
+    "coding-assistant",
+    "terminal",
+    "agent",
+    "llm",
+    "bun"
+  ],
   "license": "Apache-2.0",
   "homepage": "https://math-to-dev.vercel.app",
   "repository": {

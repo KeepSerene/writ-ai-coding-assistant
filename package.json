@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "description": "An OpenCode clone",
+  "description": "Writ — a full-stack, terminal-based agentic AI coding assistant. A pnpm monorepo containing the Bun/opentui TUI client, a Hono API server, a Prisma/Neon database layer, and shared schemas.",
   "scripts": {
     "dev:cli": "pnpm --filter @keepserene/writ dev",
     "dev:server": "pnpm --filter @writ/server dev",
@@ -14,7 +14,20 @@
     "build:server": "pnpm --filter @writ/server build",
     "start:server": "pnpm --filter @writ/server start"
   },
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "ai-agent",
+    "coding-assistant",
+    "cli",
+    "terminal",
+    "tui",
+    "llm",
+    "bun",
+    "opentui",
+    "hono",
+    "monorepo",
+    "typescript"
+  ],
   "author": "Dhrubajyoti Bhattacharjee",
   "license": "Apache-2.0",
   "devEngines": {

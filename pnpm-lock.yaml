@@ -248,9 +248,6 @@ importers:
       react-router:
         specifier: ^7.16.0
         version: 7.16.0(react-dom@19.2.7(react@19.2.6))(react@19.2.6)
-      typescript:
-        specifier: ^5
-        version: 5.9.3
       zod:
         specifier: ^4.4.3
         version: 4.4.3
