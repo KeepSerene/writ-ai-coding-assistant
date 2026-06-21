@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { sentry } from "@sentry/hono/node";
 import * as Sentry from "@sentry/hono/node";
 import { join } from "node:path";
+import type { Server as HttpServer } from "node:http";
 import landingPageHtml from "./views/landing";
 import sessionsRouter from "./routes/sessions";
 import chatRouter from "./routes/chat";
@@ -11,6 +12,8 @@ import oAuthCallbackRouter from "./routes/oauth-callback";
 import { requireAuth } from "./middlewares/require-auth";
 import billingRouter from "./routes/billing";
 import { readFileSync } from "node:fs";
+
+const isProd = process.env["NODE_ENV"] === "production";
 
 const app = new Hono();
 
@@ -100,10 +103,33 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`[server] Listening on http://localhost:${info.port}`);
 });
 
-server.setTimeout(255 * 1000);
+server.setTimeout(255 * 1000); // 255 secs
+
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(
+      `[server] Port ${port} is already in use — is a previous instance still shutting down?`,
+    );
+  } else {
+    console.error("[server] Server error:", err);
+  }
+
+  process.exit(1);
+});
+
+function closeAllConnections() {
+  (server as HttpServer).closeAllConnections();
+}
 
 function shutdown(signal: string) {
   console.log(`[server] Received ${signal}, shutting down...`);
+
+  if (isProd) {
+    setTimeout(() => closeAllConnections(), 5000).unref();
+  } else {
+    closeAllConnections();
+  }
+
   server.close((err) => {
     if (err) {
       console.error("[server] Error during shutdown:", err);

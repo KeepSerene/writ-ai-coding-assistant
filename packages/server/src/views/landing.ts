@@ -40,7 +40,7 @@ const landingPageHtml = `
     .logo {
       width: 80px;
       height: 80px;
-      object-fit: conver;
+      object-fit: cover;
       margin-bottom: 1rem;
       filter: drop-shadow(0 4px 12px rgba(0, 150, 136, 0.2)); 
       user-select: none;
@@ -65,33 +65,49 @@ const landingPageHtml = `
       font-size: 0.95rem;
     }
 
+    .note-highlight {
+      color: var(--primary);
+      font-weight: bold;
+    }
+
     .command-container {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       flex-wrap: wrap;
       justify-content: space-between;
       gap: 1rem;
       background-color: var(--mantle);
       border: 1px solid var(--surface0);
-      padding: 0.5rem 0.5rem 0.5rem 1rem;
+      padding: 0.75rem 0.5rem 0.75rem 1rem;
       border-radius: 12px;
       margin-top: 2rem;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
       width: 100%;
-      max-width: 400px;
+      max-width: 480px;
+      text-align: left;
     }
 
-    code {
-      font-size: 1.2rem;
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      font-size: 0.95rem;
       color: var(--primary);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      line-height: 1.6;
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .comment {
+      color: var(--subtext0);
+      font-size: 0.85rem;
     }
 
     button {
       background-color: var(--surface0);
       color: var(--text);
       border: 1px solid transparent;
-      padding: 0.6rem;
+      padding: 0.5rem;
       border-radius: 8px;
       cursor: pointer;
       display: flex;
@@ -129,26 +145,35 @@ const landingPageHtml = `
   
   <h1>Writ Server</h1>
 
-  <p class="subtitle">If you arrived here from your billing portal, your transaction is complete! You can safely close this tab and return to your terminal.</p>
+  <p class="subtitle"><span class="note-highlight">Note:</span> If you arrived here from your billing portal, your transaction is complete! You can safely close this tab and return to your terminal.</p>
 
   <div class="command-container">
-    <code id="command-text">npx @writ/cli</code>
+    <pre id="command-text">
+      <span class="comment"># Requires Bun v1.3.14+</span>
+
+      <span class="comment"># Recommended (Fastest)</span>
+      <span>bunx @keepserene/writ</span>
+
+      <span class="comment"># Fallback via standard npm</span>
+      <span>npx @keepserene/writ</span>
+    </pre>
 
     <button type="button" id="copy-btn" aria-label="Copy command" title="Copy command">
       <span id="btn-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy-icon lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
       </span>
     </button>
   </div>
 
   <script>
     const copyBtn = document.getElementById('copy-btn');
-    const commandText = document.getElementById('command-text').innerText;
     const btnIcon = document.getElementById('btn-icon');
-
-    const copySvg = \`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>\`;
     
-    const checkSvg = \`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>\`;
+    const commandToCopy = "bunx @keepserene/writ";
+
+    const copySvg = \`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy-icon lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>\`;
+    
+    const checkSvg = \`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-icon lucide-check"><path d="M20 6 9 17l-5-5"/></svg>\`;
 
     const setButtonState = (label, svg, isSuccess = false) => {
       copyBtn.setAttribute('aria-label', label);
@@ -164,7 +189,7 @@ const landingPageHtml = `
 
     copyBtn.addEventListener('click', async () => {
       try {
-        await navigator.clipboard.writeText(commandText);
+        await navigator.clipboard.writeText(commandToCopy);
         setButtonState('Copied!', checkSvg, true);
         setTimeout(() => setButtonState('Copy command', copySvg, false), 3000);
       } catch (err) {
