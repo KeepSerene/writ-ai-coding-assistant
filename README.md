@@ -89,6 +89,10 @@ The CLI never talks to LLM providers directly — every request is authenticated
     <td align="center"><img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/models.png" width="380" alt="Model picker" /><br/><sub>Model picker</sub></td>
     <td align="center"><img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/themes.png" width="380" alt="Theme switcher" /><br/><sub>Theme switcher</sub></td>
   </tr>
+
+  <tr>
+    <td align="center"><img src="https://raw.githubusercontent.com/KeepSerene/writ-ai-coding-assistant/main/packages/assets/server.png" width="380" alt="Server landing page" /><br/><sub>Server landing page</sub></td>
+  </tr>
 </table>
 
 ---
