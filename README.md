@@ -284,12 +284,12 @@ Type `@` followed by a path fragment anywhere in a prompt to fuzzy-search and re
 | Gemini 3.1 Flash Lite | Google     | Default low-latency option |
 | Gemini 2.5 Flash      | Google     |                            |
 | GPT OSS 120B          | Groq       | Default model              |
-| GPT OSS 20B           | Groq       |                            |
-| Qwen3 32B             | Groq       |                            |
+| GPT OSS 20B           | Groq       | High reasoning effort      |
+| Qwen3.6 27B           | Groq       | Default reasoning effort   |
 | Devstral              | Mistral    | Code-focused               |
 | Mistral Small         | Mistral    | High reasoning effort      |
 | GPT OSS 120B          | Cerebras   | Free tier                  |
-| GLM 4.7               | Cerebras   | Free tier                  |
+| Gemma 4 31B           | Cerebras   | Free tier                  |
 | Kimi K2.6             | NVIDIA NIM | Free tier                  |
 
 Pricing and provider-specific options (thinking budgets, reasoning effort, parallel tool calls) are centrally defined in `packages/shared/src/models.ts` and `packages/server/src/lib/model-resolver.ts`.

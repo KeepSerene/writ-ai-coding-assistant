@@ -66,12 +66,12 @@ export const SUPPORTED_CHAT_MODELS = [
     },
   },
   {
-    id: "qwen/qwen3-32b",
+    id: "qwen/qwen3.6-27b",
     provider: "groq",
-    label: "Qwen3 32B (Groq)",
+    label: "Qwen3.6 27B (Groq)",
     pricing: {
-      inputUsdPerMillionTokens: 0.29,
-      outputUsdPerMillionTokens: 0.59,
+      inputUsdPerMillionTokens: 0.6,
+      outputUsdPerMillionTokens: 3.0,
     },
   },
   // Mistral models
@@ -95,9 +95,9 @@ export const SUPPORTED_CHAT_MODELS = [
     pricing: { inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
   },
   {
-    id: "zai-glm-4.7",
+    id: "gemma-4-31b",
     provider: "cerebras",
-    label: "GLM 4.7 (Cerebras)",
+    label: "Gemma 4 31B (Cerebras)",
     pricing: { inputUsdPerMillionTokens: 0, outputUsdPerMillionTokens: 0 },
   },
 

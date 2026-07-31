@@ -121,9 +121,9 @@ Type `@` followed by a path fragment to reference a file or folder — e.g. `@sr
 | Model                                         | Provider   |
 | --------------------------------------------- | ---------- |
 | Gemini 3.5 Flash / 3.1 Flash Lite / 2.5 Flash | Google     |
-| GPT OSS 120B / GPT OSS 20B / Qwen3 32B        | Groq       |
+| GPT OSS 120B / GPT OSS 20B / Qwen3.6 27B      | Groq       |
 | Devstral / Mistral Small                      | Mistral    |
-| GPT OSS 120B / GLM 4.7                        | Cerebras   |
+| GPT OSS 120B / Gemma 4 31B                    | Cerebras   |
 | Kimi K2.6                                     | NVIDIA NIM |
 
 ## Configuration
