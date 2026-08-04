@@ -131,9 +131,9 @@ Type `@` followed by a path fragment to reference a file or folder — e.g. `@sr
 `writ` works out of the box with zero configuration — it ships with public, non-secret defaults pointing at the hosted demo server. If you're self-hosting your own [Writ server](https://github.com/KeepSerene/writ-ai-coding-assistant), point the CLI at it with environment variables:
 
 ```bash
-API_BASE_URL="https://your-server.example.com" \
-CLERK_API_CLIENT_BASE_URL="https://your-clerk-instance.clerk.accounts.dev" \
-CLERK_OAUTH_CLIENT_ID="your_clerk_client_id" \
+WRIT_API_BASE_URL="https://your-server.example.com" \
+WRIT_CLERK_API_CLIENT_BASE_URL="https://your-clerk-instance.clerk.accounts.dev" \
+WRIT_CLERK_OAUTH_CLIENT_ID="your_clerk_client_id" \
 writ
 ```
 

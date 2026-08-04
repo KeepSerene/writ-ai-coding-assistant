@@ -302,14 +302,14 @@ See [`.env.example`](./.env.example) for the full list with descriptions. At a h
 
 | Group                | Variables                                                                                                                                      |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Server**           | `NODE_ENV`, `PORT`, `API_BASE_URL`                                                                                                             |
+| **Server**           | `NODE_ENV`, `PORT`, `WRIT_API_BASE_URL`                                                                                                        |
 | **Database (Neon)**  | `DATABASE_URL`, `DIRECT_URL`                                                                                                                   |
 | **Sentry**           | `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_PROFILES_SAMPLE_RATE`, `SENTRY_SEND_DEFAULT_PII`                                            |
 | **LLM Providers**    | `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`, `CEREBRAS_API_KEY`, `NIM_API_KEY`                                           |
-| **Clerk Auth**       | `CLERK_API_CLIENT_BASE_URL`, `CLERK_OAUTH_CLIENT_ID`, `CLERK_OAUTH_CLIENT_SECRET`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`                 |
+| **Clerk Auth**       | `WRIT_CLERK_API_CLIENT_BASE_URL`, `WRIT_CLERK_OAUTH_CLIENT_ID`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`                                    |
 | **Polar.sh Billing** | `POLAR_ACCESS_TOKEN`, `POLAR_SERVER_ENVIRONMENT`, `POLAR_TOKENS_METER_ID`, `POLAR_STARTER_PACK_ID`, `POLAR_PRO_PACK_ID`, `POLAR_POWER_PACK_ID` |
 
-The published CLI ships with public-safe defaults baked in for `API_BASE_URL`, `CLERK_API_CLIENT_BASE_URL`, and `CLERK_OAUTH_CLIENT_ID` (none of these are secrets — the CLI is a PKCE public client by design). All server-side secrets stay exclusively in `packages/server` and `packages/db`, and are never bundled into the published CLI.
+The published CLI ships with public-safe defaults baked in for `WRIT_API_BASE_URL`, `WRIT_CLERK_API_CLIENT_BASE_URL`, and `WRIT_CLERK_OAUTH_CLIENT_ID` (none of these are secrets — the CLI is a PKCE public client by design). All server-side secrets stay exclusively in `packages/server` and `packages/db`, and are never bundled into the published CLI.
 
 ---
 
@@ -326,7 +326,7 @@ The published CLI ships with public-safe defaults baked in for `API_BASE_URL`, `
 
 This project is hosted as a personal portfolio demo, not a production SaaS — so the deployed server enforces a rolling **7-day quota of 3 messages per authenticated user** (`requirePortfolioQuota` middleware, production only) to keep hosting costs predictable. Separately, every request also checks the user's Polar.sh compute-credit balance via `requireComputeCredits`.
 
-If you want unlimited usage, the recommended path is to self-host: clone the repo, supply your own LLM provider keys, and point the CLI at your own server via the `API_BASE_URL` environment variable.
+If you want unlimited usage, the recommended path is to self-host: clone the repo, supply your own LLM provider keys, and point the CLI at your own server via the `WRIT_API_BASE_URL` environment variable.
 
 ---
 

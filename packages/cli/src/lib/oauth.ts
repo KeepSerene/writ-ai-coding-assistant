@@ -27,12 +27,12 @@ import open from "open";
 import { saveAuthToken } from "./auth-token-store";
 
 const clerkApiBaseUrl =
-  process.env["CLERK_API_CLIENT_BASE_URL"] ??
+  process.env["WRIT_CLERK_API_CLIENT_BASE_URL"] ??
   "https://crucial-lemur-72.clerk.accounts.dev";
 const clerkOAuthClientId =
-  process.env["CLERK_OAUTH_CLIENT_ID"] ?? "54hmCQJIeWcsdOHx";
+  process.env["WRIT_CLERK_OAUTH_CLIENT_ID"] ?? "54hmCQJIeWcsdOHx";
 const serverApiBaseUrl =
-  process.env["API_BASE_URL"] ?? "https://writ-server-k1sb.onrender.com";
+  process.env["WRIT_API_BASE_URL"] ?? "https://writ-server-k1sb.onrender.com";
 
 /**
  * Payload we embed in the OAuth `state` parameter.

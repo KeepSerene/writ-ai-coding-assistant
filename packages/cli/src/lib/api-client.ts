@@ -3,7 +3,7 @@ import type { AppType } from "@writ/server";
 import { clearAuthToken, getAuthToken } from "./auth-token-store";
 
 const apiBaseUrl =
-  process.env["API_BASE_URL"] ?? "https://writ-server-k1sb.onrender.com";
+  process.env["WRIT_API_BASE_URL"] ?? "https://writ-server-k1sb.onrender.com";
 
 const apiClient = hc<AppType>(apiBaseUrl, {
   fetch: async (
