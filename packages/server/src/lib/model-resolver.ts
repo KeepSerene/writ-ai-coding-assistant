@@ -65,7 +65,7 @@ const GROQ_PROVIDER_OPTIONS: Partial<Record<GroqModelId, ProviderOptions>> = {
       parallelToolCalls: true,
     },
   },
-  "qwen/qwen3.6-27b": {
+  "qwen/qwen3.8-27b": {
     groq: {
       reasoningFormat: "parsed",
       reasoningEffort: "default",

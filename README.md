@@ -141,7 +141,7 @@ The CLI never talks to LLM providers directly — every request is authenticated
 
 ## Architecture
 
-### Monorepo Structure
+### Monorepo Structure (Tentative!)
 
 ```
 writ/
@@ -282,10 +282,10 @@ Type `@` followed by a path fragment anywhere in a prompt to fuzzy-search and re
 | --------------------- | ---------- | -------------------------- |
 | Gemini 3.5 Flash      | Google     | High reasoning effort      |
 | Gemini 3.1 Flash Lite | Google     | Default low-latency option |
-| Gemini 2.5 Flash      | Google     |                            |
+| Gemini 2.5 Flash      | Google     | Thinking included          |
 | GPT OSS 120B          | Groq       | Default model              |
 | GPT OSS 20B           | Groq       | High reasoning effort      |
-| Qwen3.6 27B           | Groq       | Default reasoning effort   |
+| Qwen3.8 27B           | Groq       | Default reasoning effort   |
 | Devstral              | Mistral    | Code-focused               |
 | Mistral Small         | Mistral    | High reasoning effort      |
 | GPT OSS 120B          | Cerebras   | Free tier                  |

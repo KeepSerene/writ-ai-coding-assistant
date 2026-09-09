@@ -66,12 +66,12 @@ export const SUPPORTED_CHAT_MODELS = [
     },
   },
   {
-    id: "qwen/qwen3.6-27b",
+    id: "qwen/qwen3.8-27b",
     provider: "groq",
-    label: "Qwen3.6 27B (Groq)",
+    label: "Qwen3.8 27B (Groq)",
     pricing: {
-      inputUsdPerMillionTokens: 0.6,
-      outputUsdPerMillionTokens: 3.0,
+      inputUsdPerMillionTokens: 0.8,
+      outputUsdPerMillionTokens: 4.0,
     },
   },
   // Mistral models
